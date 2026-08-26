@@ -1,0 +1,14 @@
+<coverageStore>
+  <id>CoverageStoreInfoImpl--61a8372:19fa043a0c2:-7ff6</id>
+  <name>RC Elevation</name>
+  <type>GeoTIFF</type>
+  <enabled>true</enabled>
+  <workspace>
+    <id>WorkspaceInfoImpl--61a8372:19fa043a0c2:-7ffe</id>
+  </workspace>
+  <__default>false</__default>
+  <dateCreated>2026-08-05 20:01:34.357 UTC</dateCreated>
+  <dateModified>2026-08-05 20:07:29.941 UTC</dateModified>
+  <disableOnConnFailure>false</disableOnConnFailure>
+  <url>file:/opt/geoserver/data_dir/data/ws_09c7e6a1/RC%20Elevation/RC%20Elevation.geotiff</url>
+</coverageStore>

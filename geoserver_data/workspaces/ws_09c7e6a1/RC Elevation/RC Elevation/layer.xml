@@ -1,0 +1,16 @@
+<layer>
+  <name>RC Elevation</name>
+  <id>LayerInfoImpl--61a8372:19fa043a0c2:-7ff4</id>
+  <type>RASTER</type>
+  <defaultStyle>
+    <id>StyleInfoImpl--5a977a8c:19cba8970ac:-7ffd</id>
+  </defaultStyle>
+  <resource class="coverage">
+    <id>CoverageInfoImpl--61a8372:19fa043a0c2:-7ff5</id>
+  </resource>
+  <attribution>
+    <logoWidth>0</logoWidth>
+    <logoHeight>0</logoHeight>
+  </attribution>
+  <dateCreated>2026-08-05 20:01:36.490 UTC</dateCreated>
+</layer>
