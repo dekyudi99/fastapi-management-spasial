@@ -13,3 +13,111 @@ DEBUG 2026-08-26 04:08:49,188 [main][Log4J2Logger.java:215] : Extension lookup '
 DEBUG 2026-08-26 04:08:49,192 [main][Log4J2Logger.java:215] : Extension lookup 'ExtensionProvider', but provided ApplicationContext is unset.
 DEBUG 2026-08-26 04:08:49,192 [main][Log4J2Logger.java:215] : Extension lookup 'ExtensionFilter', but provided ApplicationContext is unset.
 DEBUG 2026-08-26 04:08:49,222 [main][Log4J2Logger.java:215] : CONFIGURING GEOSERVER LOGGING -------------------------
+26 Aug 04:08:49 CONFIG [geoserver.logging] - Log4j 2 configuration set to DEFAULT_LOGGING.xml
+26 Aug 04:08:55 CONFIG [org.geoserver] - GeoServer configuration lock is enabled
+26 Aug 04:09:07 CONFIG [geoserver.config] - Loading catalog /opt/geoserver/data_dir
+26 Aug 04:09:07 WARN   [config.datadir] - Configured parallelism is invalid: GEOSERVER_DATA_DIR_LOADER_THREADS=0, using default of 4
+26 Aug 04:09:07 CONFIG [config.datadir] - Catalog and configuration loader uses 4 threads out of 4 available cores.
+26 Aug 04:09:07 CONFIG [config.datadir] - Loaded style generic (parent=global)
+26 Aug 04:09:07 CONFIG [config.datadir] - Loaded style line (parent=global)
+26 Aug 04:09:07 CONFIG [config.datadir] - Loaded style point (parent=global)
+26 Aug 04:09:08 CONFIG [config.datadir] - Loaded style polygon (parent=global)
+26 Aug 04:09:08 CONFIG [config.datadir] - Loaded style raster (parent=global)
+26 Aug 04:09:09 CONFIG [config.datadir] - Loaded workspace ws_f9866f09
+26 Aug 04:09:09 CONFIG [config.datadir] - Loaded workspace ws_1cb08560
+26 Aug 04:09:09 CONFIG [config.datadir] - Loaded workspace ws_8df405bf
+26 Aug 04:09:09 CONFIG [config.datadir] - Loaded namespace ws_8df405bf
+26 Aug 04:09:09 CONFIG [config.datadir] - Loaded namespace ws_f9866f09
+26 Aug 04:09:09 CONFIG [config.datadir] - Loaded namespace ws_1cb08560
+26 Aug 04:09:09 CONFIG [config.datadir] - Loaded workspace ws_09c7e6a1
+26 Aug 04:09:09 CONFIG [config.datadir] - Loaded namespace ws_09c7e6a1
+26 Aug 04:09:09 CONFIG [config.datadir] - Loaded workspace ws_30cad3c4
+26 Aug 04:09:09 CONFIG [config.datadir] - Loaded workspace ws_dc4c8fa5
+26 Aug 04:09:09 CONFIG [config.datadir] - Loaded namespace ws_dc4c8fa5
+26 Aug 04:09:09 CONFIG [config.datadir] - Loaded namespace ws_30cad3c4
+26 Aug 04:09:09 CONFIG [config.datadir] - Loaded coverage store RC Elevation (parent=ws_09c7e6a1)
+26 Aug 04:09:09 CONFIG [config.datadir] - Loaded coverage store 80c14f8d-b8a5-4768-b2c4-40316720ccab.tif (parent=ws_8df405bf)
+26 Aug 04:09:09 CONFIG [config.datadir] - Loaded coverage store 22acc80a-1e84-4bc1-8d83-9db5dc5d693f.tif (parent=ws_8df405bf)
+26 Aug 04:09:10 CONFIG [config.datadir] - Loaded coverage store d7405862-2212-43fb-9526-60cb09316012.tif (parent=ws_8df405bf)
+26 Aug 04:09:12 CONFIG [config.datadir] - Loaded coverage 80c14f8d-b8a5-4768-b2c4-40316720ccab.tif, enabled (parent=ws_8df405bf/80c14f8d-b8a5-4768-b2c4-40316720ccab.tif)
+26 Aug 04:09:12 CONFIG [config.datadir] - Loaded coverage 22acc80a-1e84-4bc1-8d83-9db5dc5d693f.tif, enabled (parent=ws_8df405bf/22acc80a-1e84-4bc1-8d83-9db5dc5d693f.tif)
+26 Aug 04:09:12 CONFIG [config.datadir] - Loaded coverage d7405862-2212-43fb-9526-60cb09316012.tif, enabled (parent=ws_8df405bf/d7405862-2212-43fb-9526-60cb09316012.tif)
+26 Aug 04:09:12 CONFIG [config.datadir] - Loaded layer 80c14f8d-b8a5-4768-b2c4-40316720ccab.tif (parent=ws_8df405bf:80c14f8d-b8a5-4768-b2c4-40316720ccab.tif)
+26 Aug 04:09:12 CONFIG [config.datadir] - Loaded layer 22acc80a-1e84-4bc1-8d83-9db5dc5d693f.tif (parent=ws_8df405bf:22acc80a-1e84-4bc1-8d83-9db5dc5d693f.tif)
+26 Aug 04:09:12 CONFIG [config.datadir] - Loaded coverage RC Elevation, enabled (parent=ws_09c7e6a1/RC Elevation)
+26 Aug 04:09:12 CONFIG [config.datadir] - Loaded layer d7405862-2212-43fb-9526-60cb09316012.tif (parent=ws_8df405bf:d7405862-2212-43fb-9526-60cb09316012.tif)
+26 Aug 04:09:12 CONFIG [config.datadir] - Loaded layer RC Elevation (parent=ws_09c7e6a1:RC Elevation)
+26 Aug 04:09:12 CONFIG [config.datadir] - Loaded coverage store e09c83e7-44d6-4cc9-821c-91ec751af4ed.tif (parent=ws_09c7e6a1)
+26 Aug 04:09:12 CONFIG [config.datadir] - Loaded coverage store ae11b8ce-28b4-4b29-a407-c5b6320a18ca.tif (parent=ws_8df405bf)
+26 Aug 04:09:12 CONFIG [config.datadir] - Loaded coverage store 2a9af98c-6121-45b9-8827-08b444da1c17.tif (parent=ws_8df405bf)
+26 Aug 04:09:12 CONFIG [config.datadir] - Loaded coverage store 19417cbd-6f76-4d45-ac59-2cbb3a3d3151.tif (parent=ws_8df405bf)
+26 Aug 04:09:13 CONFIG [config.datadir] - Loaded coverage ae11b8ce-28b4-4b29-a407-c5b6320a18ca.tif, enabled (parent=ws_8df405bf/ae11b8ce-28b4-4b29-a407-c5b6320a18ca.tif)
+26 Aug 04:09:13 CONFIG [config.datadir] - Loaded layer ae11b8ce-28b4-4b29-a407-c5b6320a18ca.tif (parent=ws_8df405bf:ae11b8ce-28b4-4b29-a407-c5b6320a18ca.tif)
+26 Aug 04:09:13 CONFIG [config.datadir] - Loaded coverage e09c83e7-44d6-4cc9-821c-91ec751af4ed.tif, enabled (parent=ws_09c7e6a1/e09c83e7-44d6-4cc9-821c-91ec751af4ed.tif)
+26 Aug 04:09:13 CONFIG [config.datadir] - Loaded layer e09c83e7-44d6-4cc9-821c-91ec751af4ed.tif (parent=ws_09c7e6a1:e09c83e7-44d6-4cc9-821c-91ec751af4ed.tif)
+26 Aug 04:09:13 CONFIG [config.datadir] - Loaded coverage 19417cbd-6f76-4d45-ac59-2cbb3a3d3151.tif, enabled (parent=ws_8df405bf/19417cbd-6f76-4d45-ac59-2cbb3a3d3151.tif)
+26 Aug 04:09:13 CONFIG [config.datadir] - Loaded layer 19417cbd-6f76-4d45-ac59-2cbb3a3d3151.tif (parent=ws_8df405bf:19417cbd-6f76-4d45-ac59-2cbb3a3d3151.tif)
+26 Aug 04:09:13 INFO   [geoserver.config] - Read Catalog in 6.128 s: workspaces: 6, namespaces: 6, styles: 5, stores: 8, resources: 7, layers: 7, layer groups: 0.
+26 Aug 04:09:13 CONFIG [config.datadir] - Loading GeoServer config...
+26 Aug 04:09:14 CONFIG [config.datadir] - Loaded service 'WMSInfoImpl--5a977a8c:19cba8970ac:-7ffb', enabled
+26 Aug 04:09:14 CONFIG [config.datadir] - Loaded service 'WFSInfoImpl--5a977a8c:19cba8970ac:-7ffa', enabled
+26 Aug 04:09:14 CONFIG [config.datadir] - Loaded service 'WCSInfoImpl--5a977a8c:19cba8970ac:-7ff9', enabled
+26 Aug 04:09:14 CONFIG [config.datadir] - Loaded service 'WMTSInfoImpl--5a977a8c:19cba8970ac:-7ff8', enabled
+26 Aug 04:09:14 CONFIG [config.datadir] - Loaded service 'csw', enabled
+26 Aug 04:09:14 CONFIG [config.datadir] - Loaded service 'WPSInfoImpl--5a977a8c:19cba8970ac:-7ff7', enabled
+26 Aug 04:09:14 WARN   [config.datadir] - Configured parallelism is invalid: GEOSERVER_DATA_DIR_LOADER_THREADS=0, using default of 4
+26 Aug 04:09:14 CONFIG [config.datadir] - Catalog and configuration loader uses 4 threads out of 4 available cores.
+26 Aug 04:09:14 CONFIG [config.datadir] - Loading workspace services and settings...
+26 Aug 04:09:15 CONFIG [config.datadir] - GeoServer config (settings and services) loaded in 1.648 s
+26 Aug 04:09:15 CONFIG [gwc.config] - Will look for 'geowebcache.xml' in directory '/opt/geoserver/data_dir/gwc'.
+26 Aug 04:09:15 CONFIG [config.XMLConfiguration] - TileLayerConfiguration file validated fine.
+26 Aug 04:09:16 CONFIG [config.XMLConfiguration] - Initializing GridSets from /opt/geoserver/data_dir/gwc
+26 Aug 04:09:16 INFO   [config.XMLConfiguration] - Read GridSet InspireCRS84Quad
+26 Aug 04:09:16 CONFIG [config.XMLConfiguration] - Initializing layers from /opt/geoserver/data_dir/gwc
+26 Aug 04:09:16 CONFIG [gwc.layer] - Initializing GWC configuration based on GeoServer's Catalog
+26 Aug 04:09:16 CONFIG [gwc.layer] - GeoServer TileLayer store base directory is: gwc-layers
+26 Aug 04:09:16 CONFIG [gwc.layer] - Loading tile layers from gwc-layers
+26 Aug 04:09:16 CONFIG [gwc.layer] - Loaded 8 tile layers in 221.4 ms
+26 Aug 04:09:16 CONFIG [storage.BlobStoreAggregator] - BlobStoreConfiguration /opt/geoserver/data_dir/gwc contained no blob store infos.
+26 Aug 04:09:16 CONFIG [storage.DefaultStorageFinder] - Found system environment variable GEOWEBCACHE_CACHE_DIR set to /opt/geoserver/data_dir/gwc, using it as the default prefix.
+26 Aug 04:09:17 CONFIG [gwc.config] - Initializing GeoServer specific GWC configuration from gwc-gs.xml
+26 Aug 04:09:24 CONFIG [gwc.config] - Will look for 'geowebcache-diskquota.xml' in directory '/opt/geoserver/data_dir/gwc'.
+26 Aug 04:09:24 CONFIG [gwc.config] - Will look for 'geowebcache-diskquota-jdbc.xml' in directory '/opt/geoserver/data_dir/gwc'.
+26 Aug 04:09:24 CONFIG [diskquota.ConfigLoader] - Quota config is: /opt/geoserver/data_dir/gwc/geowebcache-diskquota.xml
+26 Aug 04:09:25 CONFIG [diskquota.ConfigLoader] - Quota config is: /opt/geoserver/data_dir/gwc/geowebcache-diskquota.xml
+26 Aug 04:09:25 INFO   [flow.config] - Loaded control-flow rule: ows.global=100
+26 Aug 04:09:25 INFO   [flow.config] - Loaded control-flow rule: ows.wms.getmap=10
+26 Aug 04:09:25 INFO   [flow.config] - Loaded control-flow rule: ows.wfs.getfeature.application/msexcel=4
+26 Aug 04:09:25 INFO   [flow.config] - Loaded control-flow rule: user=6
+26 Aug 04:09:25 INFO   [flow.config] - Loaded control-flow rule: ows.gwc=16
+26 Aug 04:09:25 INFO   [flow.config] - Loaded control-flow rule: user.ows.wps.execute=1000/d;30s
+26 Aug 04:09:25 INFO   [flow.config] - Loaded control-flow rule: user.ows.wms.getmap=30/s
+26 Aug 04:09:25 INFO   [flow.config] - Loaded control-flow rule: ip=10
+26 Aug 04:09:25 CONFIG [geoserver.flow] - Control-flow active with 8 flow controllers
+26 Aug 04:09:26 WARN   [turbojpeg.TurboJPEGMapResponse] - The turbo jpeg encoder is available for usage
+26 Aug 04:09:30 CONFIG [geowebcache.GeoWebCacheDispatcher] - Invoked setServletPrefix(gwc)
+26 Aug 04:09:30 CONFIG [wms.WMSService] - Will NOT recombine tiles for non-tiling clients.
+26 Aug 04:09:30 CONFIG [wms.WMSService] - Will proxy requests to backend that are not getmap or getcapabilities.
+26 Aug 04:09:33 CONFIG [geoserver.security] - AuthenticationCache Initialized with 1000 Max Entries, 300 seconds idle time, 600 seconds time to live and 3 concurrency level
+26 Aug 04:09:33 CONFIG [geoserver.security] - AuthenticationCache Eviction Task created to run every 600 seconds
+26 Aug 04:09:43 INFO   [geoserver.monitor] - Monitor extension enabled
+26 Aug 04:09:43 CONFIG [geoserver.wps] - Found 7 bindable processes in GeoServer specific processes
+26 Aug 04:09:43 CONFIG [geoserver.wps] - Found 89 bindable processes in Deprecated processes
+26 Aug 04:09:43 CONFIG [geoserver.wps] - Blacklisting process vec:GroupCandidateSelection as the input groupingAttributes of type class java.lang.Object cannot be handled
+26 Aug 04:09:43 CONFIG [geoserver.wps] - Found 31 bindable processes in Vector processes
+26 Aug 04:09:43 CONFIG [geoserver.wps] - Blacklisting process ras:ConvolveCoverage as the input kernel of type class org.eclipse.imagen.KernelImageN cannot be handled
+26 Aug 04:09:43 CONFIG [geoserver.wps] - Blacklisting process ras:RasterZonalStatistics2 as the input zones of type class java.lang.Object cannot be handled
+26 Aug 04:09:43 CONFIG [geoserver.wps] - Blacklisting process ras:RasterZonalStatistics2 as the input rangeData of type class java.lang.Object cannot be handled
+26 Aug 04:09:43 CONFIG [geoserver.wps] - Blacklisting process ras:RasterZonalStatistics2 as the output zonal statistics of type interface java.util.List cannot be handled
+26 Aug 04:09:43 CONFIG [geoserver.wps] - Found 18 bindable processes in Raster processes
+26 Aug 04:09:43 CONFIG [geoserver.wps] - Found 48 bindable processes in Geometry processes
+26 Aug 04:09:43 CONFIG [geoserver.wps] - Found 1 bindable processes in PolygonLabelProcess
+26 Aug 04:09:43 CONFIG [geoserver.wps] - Found 1 bindable processes in geo
+26 Aug 04:09:43 CONFIG [geoserver.wps] - Found 1 bindable processes in geo
+26 Aug 04:09:47 CONFIG [diskquota.ConfigLoader] - Quota config is: /opt/geoserver/data_dir/gwc/geowebcache-diskquota.xml
+26 Aug 04:09:47 CONFIG [diskquota.DiskQuotaMonitor] - Setting up disk quota periodic enforcement task
+26 Aug 04:09:47 CONFIG [diskquota.DiskQuotaMonitor] - 0 layers configured with their own quotas. 
+26 Aug 04:09:47 CONFIG [diskquota.DiskQuotaMonitor] - 8 layers attached to global quota 20.0 GB
+26 Aug 04:09:47 CONFIG [diskquota.DiskQuotaMonitor] - Disk quota periodic enforcement task set up every 5 SECONDS
+26 Aug 04:09:49 CONFIG [geoserver.security] - Start reloading user/groups for service named default
+26 Aug 04:09:49 CONFIG [geoserver.security] - Reloading user/groups successful for service named default
