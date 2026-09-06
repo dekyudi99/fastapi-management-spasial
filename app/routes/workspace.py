@@ -11,6 +11,9 @@ import secrets
 from sqlalchemy import desc, func
 from datetime import datetime, timedelta, timezone
 from services.hash_id import encode_id, decode_id
+from pydantic import BaseModel
+from typing import List, Optional
+from services.sld_to_layer import generate_raster_sld, create_or_update_style, assign_style_to_layer
 
 router = APIRouter(prefix="/workspace", tags=["Workspace"])
 geo = get_geoserver_connection()
@@ -129,23 +132,25 @@ def get_detail_workspace(
         )
 
         if workspace is None:
-            HTTPException(status_code=404, detail="Workspace tidak ditemukan!")
+            raise HTTPException(status_code=404, detail="Workspace tidak ditemukan!")
 
         result = {
             "id": encode_id(workspace.id),
             "name": workspace.name,
+            "ws_name": workspace.ws_name,
+            "project_id": encode_id(workspace.project_id),
             "created_at": workspace.created_at,
         }
 
         return {
             "success": True,
-            "detail": "Get detail workspace is successfulL",
+            "detail": "Get detail workspace is successful",
             "data": result
         }
     except HTTPException:
         raise
     except Exception as e:
-        HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e))
 
 # Fungsi untuk menghapus workspace
 @router.delete("/delete/{hashed_id}")
@@ -236,3 +241,73 @@ def get_recently(
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+class ColorEntryItem(BaseModel):
+    quantity: float
+    color: str
+    opacity: float = 1.0
+    label: Optional[str] = ""
+
+class WorkspaceDefaultStyleRequest(BaseModel):
+    style_type: Optional[str] = "values" # "values", "intervals", "ramp"
+    colors: List[ColorEntryItem]
+    apply_to_existing: Optional[bool] = False
+
+# Simpan / update default palette style untuk workspace
+@router.post("/style/{hashed_id}")
+def save_workspace_default_style(
+    hashed_id: str,
+    req: WorkspaceDefaultStyleRequest,
+    current_user: Users = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    try:
+        ws_id = decode_id(hashed_id)
+        workspace = (
+            db.query(Workspace)
+            .join(Project)
+            .filter(Workspace.id == ws_id, Project.user_id == current_user.id)
+            .first()
+        )
+        if not workspace:
+            raise HTTPException(status_code=404, detail="Workspace tidak ditemukan!")
+
+        style_name = f"default_{workspace.ws_name}"
+
+        # 1. Generate XML SLD
+        sld_xml = generate_raster_sld(
+            style_name=style_name,
+            color_entries=[c.dict() for c in req.colors],
+            style_type=req.style_type or "values"
+        )
+
+        # 2. Buat atau perbarui style di GeoServer
+        create_or_update_style(style_name, sld_xml)
+
+        # 3. Jika diminta terapkan ke semua layer yang sudah ada di workspace ini
+        updated_count = 0
+        if req.apply_to_existing:
+            layers = db.query(Layer).filter(
+                Layer.workspace_id == workspace.id,
+                Layer.layer_type == "raster"
+            ).all()
+
+            for lyr in layers:
+                try:
+                    assign_style_to_layer(workspace.ws_name, lyr.geoserver_name, style_name)
+                    updated_count += 1
+                except Exception as le:
+                    print(f"Gagal mengaitkan style ke {lyr.name}: {le}")
+
+        return {
+            "success": True,
+            "detail": f"Default style untuk workspace '{workspace.name}' berhasil disimpan!",
+            "style_name": style_name,
+            "updated_layers_count": updated_count
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error saving workspace style: {e}")
+        raise HTTPException(status_code=500, detail=f"Gagal menyimpan default style: {str(e)}")

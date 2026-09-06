@@ -16,3 +16,4 @@ bcrypt
 pyjwt
 datetime
 sqids
+geopandas

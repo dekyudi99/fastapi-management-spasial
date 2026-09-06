@@ -1,0 +1,19 @@
+<layer>
+  <name>artana_d6b49ebb-133e-4eec-a5fb-542bf31565cc</name>
+  <id>LayerInfoImpl--63cfc79e:1a06429b8de:-6d3d</id>
+  <type>RASTER</type>
+  <defaultStyle>
+    <id>StyleInfoImpl--63cfc79e:1a06429b8de:-6cd8</id>
+  </defaultStyle>
+  <resource class="coverage">
+    <id>CoverageInfoImpl--63cfc79e:1a06429b8de:-6d3e</id>
+  </resource>
+  <queryable>true</queryable>
+  <opaque>false</opaque>
+  <attribution>
+    <logoWidth>0</logoWidth>
+    <logoHeight>0</logoHeight>
+  </attribution>
+  <dateCreated>2026-09-06 01:30:01.394 UTC</dateCreated>
+  <dateModified>2026-09-06 08:44:46.38 UTC</dateModified>
+</layer>

@@ -1,14 +1,14 @@
 <coverage>
-  <id>CoverageInfoImpl--61a8372:19fa043a0c2:-7ff5</id>
-  <name>RC Elevation</name>
-  <nativeName>RC Elevation</nativeName>
+  <id>CoverageInfoImpl-6dc9b2a1:1a0604bf66c:-7ce3</id>
+  <name>4c8a12a5-97d3-4cda-bd2c-46cdaaa3adab.tif</name>
+  <nativeName>4c8a12a5-97d3-4cda-bd2c-46cdaaa3adab.tif</nativeName>
   <namespace>
-    <id>NamespaceInfoImpl--61a8372:19fa043a0c2:-7ffd</id>
+    <id>NamespaceInfoImpl-3a7365dc:1a02f1b2848:-7ffd</id>
   </namespace>
-  <title>RC Elevation</title>
+  <title>4c8a12a5-97d3-4cda-bd2c-46cdaaa3adab.tif</title>
   <description>Generated from GeoTIFF</description>
   <keywords>
-    <string>RC Elevation</string>
+    <string>4c8a12a5-97d3-4cda-bd2c-46cdaaa3adab.tif</string>
     <string>WCS</string>
     <string>GeoTIFF</string>
   </keywords>
@@ -49,12 +49,11 @@
   </latLonBoundingBox>
   <projectionPolicy>REPROJECT_TO_DECLARED</projectionPolicy>
   <enabled>true</enabled>
-  <advertised>true</advertised>
   <metadata>
-    <entry key="dirName">RC Elevation_null</entry>
+    <entry key="dirName">4c8a12a5-97d3-4cda-bd2c-46cdaaa3adab.tif_null</entry>
   </metadata>
   <store class="coverageStore">
-    <id>CoverageStoreInfoImpl--61a8372:19fa043a0c2:-7ff6</id>
+    <id>CoverageStoreInfoImpl-6dc9b2a1:1a0604bf66c:-7ce4</id>
   </store>
   <serviceConfiguration>false</serviceConfiguration>
   <simpleConversionEnabled>false</simpleConversionEnabled>
@@ -75,24 +74,24 @@
     <crs>EPSG:32647</crs>
   </grid>
   <supportedFormats>
+    <string>GeoPackage (mosaic)</string>
+    <string>ImagePyramid</string>
+    <string>RST</string>
+    <string>AIG</string>
+    <string>ImageMosaic</string>
+    <string>ArcGrid</string>
+    <string>DTED</string>
+    <string>RPFTOC</string>
+    <string>EHdr</string>
     <string>ENVIHdr</string>
     <string>VRT</string>
+    <string>GEOTIFF</string>
+    <string>ERDASImg</string>
     <string>GIF</string>
     <string>PNG</string>
     <string>JPEG</string>
     <string>TIFF</string>
     <string>NITF</string>
-    <string>RST</string>
-    <string>ArcGrid</string>
-    <string>AIG</string>
-    <string>DTED</string>
-    <string>EHdr</string>
-    <string>GEOTIFF</string>
-    <string>ImagePyramid</string>
-    <string>ERDASImg</string>
-    <string>RPFTOC</string>
-    <string>ImageMosaic</string>
-    <string>GeoPackage (mosaic)</string>
     <string>SRP</string>
   </supportedFormats>
   <interpolationMethods>
@@ -141,5 +140,5 @@
       <string>true</string>
     </entry>
   </parameters>
-  <nativeCoverageName>RC Elevation</nativeCoverageName>
+  <nativeCoverageName>4c8a12a5-97d3-4cda-bd2c-46cdaaa3adab.tif</nativeCoverageName>
 </coverage>

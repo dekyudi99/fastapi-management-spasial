@@ -1,8 +1,8 @@
 <GeoServerTileLayer>
-  <id>LayerInfoImpl--61a8372:19fa043a0c2:-7ff4</id>
+  <id>LayerInfoImpl--63cfc79e:1a06429b8de:-6f91</id>
   <enabled>true</enabled>
   <inMemoryCached>true</inMemoryCached>
-  <name>ws_09c7e6a1:RC Elevation</name>
+  <name>ws_09c7e6a1:artana_f0e40274-b4e2-47ef-ae44-8440f87de2e2</name>
   <mimeFormats>
     <string>image/png</string>
     <string>image/jpeg</string>

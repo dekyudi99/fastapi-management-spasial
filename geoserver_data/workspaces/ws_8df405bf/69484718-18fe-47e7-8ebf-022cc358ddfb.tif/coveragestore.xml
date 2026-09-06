@@ -1,0 +1,13 @@
+<coverageStore>
+  <id>CoverageStoreInfoImpl--63cfc79e:1a06429b8de:-7133</id>
+  <name>69484718-18fe-47e7-8ebf-022cc358ddfb.tif</name>
+  <type>GeoTIFF</type>
+  <enabled>true</enabled>
+  <workspace>
+    <id>WorkspaceInfoImpl-3a7365dc:1a02f1b2848:-7ffe</id>
+  </workspace>
+  <__default>false</__default>
+  <dateCreated>2026-09-05 14:27:58.434 UTC</dateCreated>
+  <disableOnConnFailure>false</disableOnConnFailure>
+  <url>file:data/ws_8df405bf/69484718-18fe-47e7-8ebf-022cc358ddfb.tif/69484718-18fe-47e7-8ebf-022cc358ddfb.tif.geotiff</url>
+</coverageStore>

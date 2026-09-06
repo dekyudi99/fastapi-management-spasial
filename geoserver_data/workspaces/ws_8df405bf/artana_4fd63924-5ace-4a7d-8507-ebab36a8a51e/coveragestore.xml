@@ -1,0 +1,13 @@
+<coverageStore>
+  <id>CoverageStoreInfoImpl--63cfc79e:1a06429b8de:-6dc3</id>
+  <name>artana_4fd63924-5ace-4a7d-8507-ebab36a8a51e</name>
+  <type>GeoTIFF</type>
+  <enabled>true</enabled>
+  <workspace>
+    <id>WorkspaceInfoImpl-3a7365dc:1a02f1b2848:-7ffe</id>
+  </workspace>
+  <__default>false</__default>
+  <dateCreated>2026-09-05 23:40:06.148 UTC</dateCreated>
+  <disableOnConnFailure>false</disableOnConnFailure>
+  <url>file:data/ws_8df405bf/artana_4fd63924-5ace-4a7d-8507-ebab36a8a51e/artana_4fd63924-5ace-4a7d-8507-ebab36a8a51e.geotiff</url>
+</coverageStore>

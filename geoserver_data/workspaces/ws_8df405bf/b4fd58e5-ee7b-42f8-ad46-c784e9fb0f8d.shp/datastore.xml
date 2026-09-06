@@ -1,0 +1,16 @@
+<dataStore>
+  <id>DataStoreInfoImpl--63cfc79e:1a06429b8de:-7ad9</id>
+  <name>b4fd58e5-ee7b-42f8-ad46-c784e9fb0f8d.shp</name>
+  <type>Shapefile</type>
+  <enabled>true</enabled>
+  <workspace>
+    <id>WorkspaceInfoImpl-3a7365dc:1a02f1b2848:-7ffe</id>
+  </workspace>
+  <connectionParameters>
+    <entry key="namespace">http://ws_8df405bf</entry>
+    <entry key="url">file:/data_vector/b4fd58e5-ee7b-42f8-ad46-c784e9fb0f8d/Nakhon_Pathom_Boundary.shp</entry>
+  </connectionParameters>
+  <__default>false</__default>
+  <dateCreated>2026-09-03 00:44:08.580 UTC</dateCreated>
+  <disableOnConnFailure>false</disableOnConnFailure>
+</dataStore>
