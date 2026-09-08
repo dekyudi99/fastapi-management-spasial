@@ -152,7 +152,7 @@ def list_layers(
 ):
     try:
         # URL base WMS GeoServer — ambil dari env, fallback ke localhost
-        GEOSERVER_WMS_BASE = os.getenv("GEOSERVER_WMS_URL")
+        GEOSERVER_URL = os.getenv("GEOSERVER_WMS_URL")
 
         # 1. Base Query Filter (Layer -> Workspace -> Project -> User)
         base_query = (
