@@ -152,7 +152,7 @@ def list_layers(
 ):
     try:
         # URL base WMS GeoServer — ambil dari env, fallback ke localhost
-        GEOSERVER_URL = os.getenv("GEOSERVER_WMS_URL")
+        GEOSERVER_URL = os.getenv("GEOSERVER_URL")
 
         # 1. Base Query Filter (Layer -> Workspace -> Project -> User)
         base_query = (
@@ -213,7 +213,7 @@ def list_layers(
                 "status": layer.status,
                 "bbox": [minx, miny, maxx, maxy] if minx is not None else None,
                 # URL WMS siap pakai untuk Leaflet WMSTileLayer
-                "wms_url": f"{GEOSERVER_WMS_BASE}/{workspace_name}/wms",
+                "wms_url": f"{GEOSERVER_URL}/{workspace_name}/wms",
                 "created_at": layer.created_at,
             }
             for layer, workspace_name, workspace_display_name, minx, miny, maxx, maxy in layers_result
