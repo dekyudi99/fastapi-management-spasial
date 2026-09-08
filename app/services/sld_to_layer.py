@@ -72,11 +72,26 @@ def create_or_update_style(style_name: str, sld_xml: str) -> bool:
     return True
 
 
+def style_exists_in_geoserver(style_name: str) -> bool:
+    """Cek apakah style tertentu sudah ada di GeoServer."""
+    geoserver_url = os.getenv("GEOSERVER_URL", "http://geoserver:8080/geoserver")
+    user = os.getenv("GEOSERVER_USER", "admin")
+    pw = os.getenv("GEOSERVER_PASS", "rahasia")
+    auth = HTTPBasicAuth(user, pw)
+    res = requests.get(f"{geoserver_url}/rest/styles/{style_name}.json", auth=auth)
+    return res.status_code == 200
+
+
 def assign_style_to_layer(workspace: str, layer_name: str, style_name: str) -> bool:
     geoserver_url = os.getenv("GEOSERVER_URL", "http://geoserver:8080/geoserver")
     user = os.getenv("GEOSERVER_USER", "admin")
     pw = os.getenv("GEOSERVER_PASS", "rahasia")
     auth = HTTPBasicAuth(user, pw)
+
+    # Verifikasi style ada di GeoServer sebelum assign
+    # Jika tidak ada, gunakan style bawaan GeoServer 'raster' yang selalu tersedia
+    if not style_exists_in_geoserver(style_name):
+        raise Exception(f"Style '{style_name}' tidak ditemukan di GeoServer. Gunakan apply_sld_to_layer untuk membuat style baru terlebih dahulu.")
 
     layer_xml = f"""
     <layer>

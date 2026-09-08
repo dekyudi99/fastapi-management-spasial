@@ -23,7 +23,7 @@ from services.vector_service import get_vector_metadata, prepare_csv_as_geopacka
 from services.hash_id import decode_id
 from pydantic import BaseModel
 from typing import List, Optional
-from services.sld_to_layer import apply_sld_to_layer, generate_raster_sld, assign_style_to_layer
+from services.sld_to_layer import apply_sld_to_layer, generate_raster_sld, assign_style_to_layer, style_exists_in_geoserver
 
 router = APIRouter(prefix="/layer", tags=["Layer"])
 geo = get_geoserver_connection()
@@ -122,12 +122,32 @@ async def publish_raster(
         if success:
             print(f"Berhasil! Layer '{layer_name}' siap diakses via WMS.")
             # Cek apakah workspace memiliki default style, jika ada otomatis terapkan!
+            # Jika belum ada, buat style generic raster (grayscale) lalu assign
             default_style_name = f"default_{workspace.ws_name}"
             try:
-                assign_style_to_layer(workspace.ws_name, store_name, default_style_name)
-                print(f"Otomatis menerapkan default workspace style '{default_style_name}' ke layer '{layer_name}'")
+                if not style_exists_in_geoserver(default_style_name):
+                    # Buat style generic grayscale untuk raster
+                    generic_sld = generate_raster_sld(
+                        style_name=default_style_name,
+                        color_entries=[
+                            {"quantity": 0,   "color": "#000000", "opacity": 1.0, "label": "Low"},
+                            {"quantity": 128, "color": "#7f7f7f", "opacity": 1.0, "label": "Mid"},
+                            {"quantity": 255, "color": "#ffffff", "opacity": 1.0, "label": "High"},
+                        ],
+                        style_type="ramp"
+                    )
+                    apply_sld_to_layer(
+                        workspace=workspace.ws_name,
+                        layer_name=store_name,
+                        style_name=default_style_name,
+                        sld_xml=generic_sld
+                    )
+                    print(f"Membuat dan menerapkan default style baru '{default_style_name}' ke layer '{layer_name}'")
+                else:
+                    assign_style_to_layer(workspace.ws_name, store_name, default_style_name)
+                    print(f"Otomatis menerapkan default workspace style '{default_style_name}' ke layer '{layer_name}'")
             except Exception as se:
-                print(f"Info: Default workspace style belum dibuat atau tidak diterapkan: {se}")
+                print(f"Info: Gagal menerapkan style, layer tetap menggunakan style default GeoServer: {se}")
 
             result = f"Layer '{layer_name}' berhasil dipublikasikan di workspace '{workspace.ws_name}'"
         else:
@@ -213,7 +233,6 @@ def list_layers(
                 "height": layer.height,
                 "status": layer.status,
                 "bbox": [minx, miny, maxx, maxy] if minx is not None else None,
-                # URL WMS siap pakai untuk Leaflet WMSTileLayer
                 "wms_url": f"{wms_base}/{workspace_name}/wms",
                 "created_at": layer.created_at,
             }
