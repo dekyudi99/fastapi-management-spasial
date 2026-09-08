@@ -152,7 +152,7 @@ def list_layers(
 ):
     try:
         # URL base WMS GeoServer — ambil dari env, fallback ke localhost
-        GEOSERVER_WMS_BASE = os.getenv("GEOSERVER_WMS_URL", "http://localhost:8080/geoserver")
+        GEOSERVER_WMS_BASE = os.getenv("GEOSERVER_WMS_URL")
 
         # 1. Base Query Filter (Layer -> Workspace -> Project -> User)
         base_query = (
@@ -378,4 +378,4 @@ def delete_layer(
         raise
     except Exception as e:
         db.rollback()
-        raise HTTPException(status_code=500, detail=f"Gagal menghapus layer: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Gagal menghapus layer: {str(e)}")
