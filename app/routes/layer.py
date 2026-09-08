@@ -151,8 +151,9 @@ def list_layers(
     db: Session = Depends(get_db)
 ):
     try:
-        # URL base WMS GeoServer — ambil dari env, fallback ke localhost
-        GEOSERVER_URL = os.getenv("GEOSERVER_URL")
+        # URL base WMS GeoServer untuk client browser — ambil dari .env (GEOSERVER_WMS_URL)
+        # JANGAN gunakan GEOSERVER_URL karena itu hostname internal Docker (http://geoserver:8080)
+        wms_base = (os.getenv("GEOSERVER_WMS_URL") or "http://localhost:8080/geoserver").rstrip("/")
 
         # 1. Base Query Filter (Layer -> Workspace -> Project -> User)
         base_query = (
@@ -213,7 +214,7 @@ def list_layers(
                 "status": layer.status,
                 "bbox": [minx, miny, maxx, maxy] if minx is not None else None,
                 # URL WMS siap pakai untuk Leaflet WMSTileLayer
-                "wms_url": f"{GEOSERVER_URL}/{workspace_name}/wms",
+                "wms_url": f"{wms_base}/{workspace_name}/wms",
                 "created_at": layer.created_at,
             }
             for layer, workspace_name, workspace_display_name, minx, miny, maxx, maxy in layers_result
