@@ -273,8 +273,8 @@ def get_layer_preview(
     # 1. Ambil metadata dari PostGIS berdasarkan ID
     # data = db.query(RasterMetadata).filter(id=id).first()
     
-    # 2. Definisikan Base URL (Bisa diatur di file .env untuk VPS)
-    base_url = "http://localhost:8080/geoserver"
+    # 2. Definisikan Base URL (diambil dari file .env)
+    base_url = (os.getenv("GEOSERVER_WMS_URL") or "http://localhost:8080/geoserver").rstrip("/")
     
     workspace = "ikya_auto_test" # Sesuai folder di GeoServer Anda
     layer_name = "singaraja"      # Diambil dari kolom layer_name di DB

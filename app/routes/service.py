@@ -11,7 +11,7 @@ load_dotenv()
 
 router = APIRouter(prefix="/service", tags=["Service"])
 
-GEOSERVER_URL = "http://localhost:8080/geoserver"
+GEOSERVER_URL = os.getenv("GEOSERVER_URL", "http://geoserver:8080/geoserver")
 USERNAME = os.getenv("GEOSERVER_USER")
 PASSWORD = os.getenv("GEOSERVER_PASS")
 
