@@ -28,7 +28,7 @@ def create_workspace(
 ):
     try:
         id = decode_id(hashed_id)
-        
+
         project = db.query(Project).filter(Project.id == id, Project.user_id == current_user.id).first()
 
         if project is None:

@@ -33,7 +33,7 @@ from models.api_key import ApiKey
 from models.layer_group import LayerGroup, LayerGroupLayer
 from services.layer_group_service import create_geoserver_layergroup, delete_geoserver_layergroup
 from services.api_key_service import verify_api_key
-from services.hash_id import decode_id
+from services.hash_id import decode_id, encode_id
 from services.raster_service import get_tiff_metadata, validate_single_band
 from services.log_service import create_log
 from services.sld_to_layer import (
@@ -981,10 +981,11 @@ async def s2s_create_layer_group(
         return {
             "success": True,
             "data": {
-                "id": layer_group.id,
+                "id": encode_id(layer_group.id),
+                "raw_id": layer_group.id,
                 "name": layer_group.name,
                 "title": layer_group.title,
-                "workspace_id": workspace.id,
+                "workspace_id": encode_id(workspace.id),
                 "workspace_name": workspace.ws_name,
                 "client_user_id": client_uid,
                 "wms_url": wms_url,
@@ -1061,11 +1062,12 @@ async def s2s_list_layer_groups(
             )
 
             results.append({
-                "id": grp.id,
+                "id": encode_id(grp.id),
+                "raw_id": grp.id,
                 "name": grp.name,
                 "title": grp.title,
                 "abstract_text": grp.abstract_text,
-                "workspace_id": grp.workspace_id,
+                "workspace_id": encode_id(grp.workspace_id),
                 "workspace_name": ws_name,
                 "workspace_display_name": ws_display,
                 "client_user_id": grp.client_user_id,
@@ -1074,7 +1076,8 @@ async def s2s_list_layer_groups(
                 "bbox": bbox,
                 "layers": [
                     {
-                        "id": ml[0],
+                        "id": encode_id(ml[0]),
+                        "raw_id": ml[0],
                         "name": ml[1],
                         "order": ml[3]
                     }
@@ -1091,21 +1094,25 @@ async def s2s_list_layer_groups(
         raise HTTPException(status_code=500, detail=f"Failed to retrieve list of layer groups: {str(e)}")
 
 
-# ── 6. DELETE /s2s/layer-groups/{id} ──────────────────────────────────────────
+# ── 6. DELETE /s2s/layer-groups/{hashed_id} ──────────────────────────────────────────
 
-@router.delete("/layer-groups/{id}")
+@router.delete("/layer-groups/{hashed_id}")
 async def s2s_delete_layer_group(
-    id: int,
+    hashed_id: str,
     request: Request = None,
     api_key: ApiKey = Depends(verify_api_key),
     db: Session = Depends(get_db),
 ):
     try:
+        grp_id = int(hashed_id) if str(hashed_id).isdigit() else decode_id(str(hashed_id))
+        if grp_id is None:
+            raise HTTPException(status_code=400, detail="Invalid Layer Group ID.")
+
         grp = (
             db.query(LayerGroup)
             .join(Workspace, Workspace.id == LayerGroup.workspace_id)
             .join(Project, Project.id == Workspace.project_id)
-            .filter(LayerGroup.id == id, Project.id == api_key.project_id)
+            .filter(LayerGroup.id == grp_id, Project.id == api_key.project_id)
             .first()
         )
         if not grp:
@@ -1118,7 +1125,7 @@ async def s2s_delete_layer_group(
         db.delete(grp)
         db.commit()
 
-        return {"success": True, "detail": f"Layer Group #{id} deleted successfully."}
+        return {"success": True, "detail": f"Layer Group #{hashed_id} deleted successfully."}
     except HTTPException:
         raise
     except Exception as e:
@@ -1126,11 +1133,11 @@ async def s2s_delete_layer_group(
         raise HTTPException(status_code=500, detail=f"Failed to delete layer group: {str(e)}")
 
 
-# ── 7. PUT /s2s/layer-groups/{id} (Update Layer Group via S2S) ─────────────────
+# ── 7. PUT /s2s/layer-groups/{hashed_id} (Update Layer Group via S2S) ─────────────────
 
-@router.put("/layer-groups/{id}")
+@router.put("/layer-groups/{hashed_id}")
 async def s2s_update_layer_group(
-    id: int,
+    hashed_id: str,
     req: S2SUpdateLayerGroupRequest,
     request: Request = None,
     api_key: ApiKey = Depends(verify_api_key),
@@ -1143,11 +1150,15 @@ async def s2s_update_layer_group(
     user_agent = request.headers.get("user-agent") if request else None
 
     try:
+        grp_id = int(hashed_id) if str(hashed_id).isdigit() else decode_id(str(hashed_id))
+        if grp_id is None:
+            raise HTTPException(status_code=400, detail="Invalid Layer Group ID.")
+
         query = (
             db.query(LayerGroup)
             .join(Workspace, Workspace.id == LayerGroup.workspace_id)
             .join(Project, Project.id == Workspace.project_id)
-            .filter(LayerGroup.id == id, Project.id == api_key.project_id)
+            .filter(LayerGroup.id == grp_id, Project.id == api_key.project_id)
         )
         if req.client_user_id:
             query = query.filter(LayerGroup.client_user_id == str(req.client_user_id))
@@ -1170,14 +1181,17 @@ async def s2s_update_layer_group(
             if len(req.layer_ids) == 0:
                 raise HTTPException(status_code=400, detail="Layer Group must have at least 1 member layer.")
 
+            raw_ids = [int(lid) if str(lid).isdigit() else decode_id(str(lid)) for lid in req.layer_ids]
+            valid_ids = [i for i in raw_ids if i is not None]
+
             # Cari layer anggota di workspace ini
             layers = (
                 db.query(Layer)
-                .filter(Layer.id.in_(req.layer_ids), Layer.workspace_id == workspace.id)
+                .filter(Layer.id.in_(valid_ids), Layer.workspace_id == workspace.id)
                 .all()
             )
             layer_dict = {l.id: l for l in layers}
-            valid_layers = [layer_dict[lid] for lid in req.layer_ids if lid in layer_dict]
+            valid_layers = [layer_dict[lid] for lid in valid_ids if lid in layer_dict]
 
             if len(valid_layers) == 0:
                 raise HTTPException(status_code=400, detail="No valid member layers found.")
@@ -1244,11 +1258,12 @@ async def s2s_update_layer_group(
             "success": True,
             "detail": f"Layer Group '{grp.title or grp.name}' updated successfully.",
             "data": {
-                "id": grp.id,
+                "id": encode_id(grp.id),
+                "raw_id": grp.id,
                 "name": grp.name,
                 "title": grp.title,
                 "abstract_text": grp.abstract_text,
-                "workspace_id": grp.workspace_id,
+                "workspace_id": encode_id(grp.workspace_id),
                 "workspace_name": workspace.ws_name,
                 "client_user_id": grp.client_user_id,
                 "wms_url": f"{wms_base}/{workspace.ws_name}/wms",

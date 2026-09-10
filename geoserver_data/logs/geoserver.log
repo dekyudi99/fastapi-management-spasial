@@ -134564,3 +134564,19 @@ Request: getMap
 	Width = 256
 10 Sep 05:37:22 INFO   [geoserver.flow] - releasing flow controllers for [WMS 1.1.1 GetMap]
 10 Sep 05:37:22 INFO   [geoserver.flow] - Request completed, running requests: 0, blocked requests: 0
+CONFIG 2026-09-10 09:50:34,665 [main][Log4J2Logger.java:210] : Logging policy: Log4J2
+CONFIG 2026-09-10 09:50:35,371 [main][Log4J2Logger.java:184] : Factory implementations for category GridCoverageFactory:
+  org.geotools.coverage.grid.GridCoverageFactory
+CONFIG 2026-09-10 09:50:38,572 [main][Log4J2Logger.java:184] : Factory implementations for category FilterFactory:
+  org.geotools.filter.FilterFactoryImpl
+CONFIG 2026-09-10 09:50:38,841 [main][Log4J2Logger.java:184] : Factory implementations for category StyleFactory:
+  org.geotools.styling.StyleFactoryImpl
+CONFIG 2026-09-10 09:50:38,863 [main][Log4J2Logger.java:184] : Factory implementations for category FeatureFactory:
+  org.geotools.feature.LenientFeatureFactoryImpl
+  org.geotools.feature.ValidatingFeatureFactoryImpl
+DEBUG 2026-09-10 09:50:43,123 [main][Log4J2Logger.java:215] : Extension lookup 'XStreamPersisterInitializer', prior to bean geoserverExtensions initialisation.
+DEBUG 2026-09-10 09:50:43,162 [main][Log4J2Logger.java:215] : Extension lookup 'ExtensionFilter', prior to bean geoserverExtensions initialisation.
+DEBUG 2026-09-10 09:50:43,198 [main][Log4J2Logger.java:215] : Extension lookup 'ExtensionProvider', but provided ApplicationContext is unset.
+DEBUG 2026-09-10 09:50:43,207 [main][Log4J2Logger.java:215] : Extension lookup 'ExtensionFilter', but provided ApplicationContext is unset.
+DEBUG 2026-09-10 09:50:43,688 [main][Log4J2Logger.java:215] : CONFIGURING GEOSERVER LOGGING -------------------------
+10 Sep 09:50:48 CONFIG [geoserver.logging] - Log4j 2 configuration set to DEFAULT_LOGGING.xml
