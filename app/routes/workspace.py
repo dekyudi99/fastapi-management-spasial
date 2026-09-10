@@ -19,14 +19,16 @@ router = APIRouter(prefix="/workspace", tags=["Workspace"])
 geo = get_geoserver_connection()
 
 # Untuk membuat workspace baru di GeoServer
-@router.post("/create/{id}", status_code=status.HTTP_201_CREATED)
+@router.post("/create/{hashed_id}", status_code=status.HTTP_201_CREATED)
 def create_workspace(
-    id: int,
+    hashed_id: str,
     name_workspace: str = Form(...),
     current_user: Users = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     try:
+        id = decode_id(hashed_id)
+        
         project = db.query(Project).filter(Project.id == id, Project.user_id == current_user.id).first()
 
         if project is None:
@@ -340,4 +342,4 @@ def save_workspace_default_style(
         raise
     except Exception as e:
         print(f"Error saving workspace style: {e}")
-        raise HTTPException(status_code=500, detail=f"Gagal menyimpan default style: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Gagal menyimpan default style: {str(e)}")
