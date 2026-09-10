@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, ForeignKey, DateTime, Text
+from sqlalchemy import Column, Integer, String, ForeignKey, DateTime, Text, JSON
 from geoalchemy2 import Geometry
 from config.database import Base
 from services.timesatampz_service import TimestampMixin
@@ -38,3 +38,9 @@ class Layer(TimestampMixin, Base):
     file_path = Column(Text)
 
     status = Column(String(50))
+
+    # Multi-user identifier dari sistem eksternal (contoh: ID pengguna di Laravel / FlowGIS)
+    client_user_id = Column(String(100), nullable=True, index=True)
+
+    # Metadata fleksibel (JSON) untuk menyimpan statistics, legends, tile maps, dll
+    metadata_json = Column(JSON, nullable=True)

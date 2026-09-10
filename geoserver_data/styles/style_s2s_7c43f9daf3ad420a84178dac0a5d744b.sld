@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?><sld:StyledLayerDescriptor xmlns:sld="http://www.opengis.net/sld" xmlns="http://www.opengis.net/sld" xmlns:gml="http://www.opengis.net/gml" xmlns:ogc="http://www.opengis.net/ogc" version="1.0.0">
+  <sld:NamedLayer>
+    <sld:Name>Default Styler</sld:Name>
+    <sld:UserStyle>
+      <sld:Name>Default Styler</sld:Name>
+      <sld:Title>FloodEvent Style</sld:Title>
+      <sld:FeatureTypeStyle>
+        <sld:Name>name</sld:Name>
+        <sld:Rule>
+          <sld:RasterSymbolizer>
+            <sld:ColorMap type="values">
+              <sld:ColorMapEntry color="#000000" opacity="0.0" quantity="0" label="Non-Flooded"/>
+              <sld:ColorMapEntry color="#D60000" opacity="1.0" quantity="1" label="New Flooded Area"/>
+            </sld:ColorMap>
+            <sld:ContrastEnhancement/>
+          </sld:RasterSymbolizer>
+        </sld:Rule>
+      </sld:FeatureTypeStyle>
+    </sld:UserStyle>
+  </sld:NamedLayer>
+</sld:StyledLayerDescriptor>
+

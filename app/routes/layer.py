@@ -164,7 +164,7 @@ async def publish_raster(
 @router.get("/list")
 def list_layers(
     page: int = Query(1, ge=1),
-    size: int = Query(10, ge=1, le=100),
+    size: int = Query(10, ge=1, le=500),
     search: Optional[str] = Query(None),
     workspace_id: Optional[str] = Query(None),
     current_user: Users = Depends(get_current_user),

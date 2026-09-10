@@ -1,0 +1,30 @@
+<layerGroup>
+  <id>LayerGroupInfoImpl--63cfc79e:1a06429b8de:-5f6a</id>
+  <name>lg_flood_event_and_risk</name>
+  <mode>SINGLE</mode>
+  <title>Flood Event and Risk</title>
+  <abstractTxt>hello</abstractTxt>
+  <workspace>
+    <id>WorkspaceInfoImpl-3a7365dc:1a02f1b2848:-7ffe</id>
+  </workspace>
+  <publishables>
+    <published type="layer">
+      <id>LayerInfoImpl--63cfc79e:1a06429b8de:-6d4c</id>
+    </published>
+    <published type="layer">
+      <id>LayerInfoImpl--63cfc79e:1a06429b8de:-6d3d</id>
+    </published>
+  </publishables>
+  <styles>
+    <style/>
+    <style/>
+  </styles>
+  <bounds>
+    <minx>99.74174262635871</minx>
+    <maxx>100.33822397501407</maxx>
+    <miny>13.635527697650216</miny>
+    <maxy>14.204161272497874</maxy>
+    <crs>EPSG:4326</crs>
+  </bounds>
+  <dateCreated>2026-09-09 08:24:19.646 UTC</dateCreated>
+</layerGroup>

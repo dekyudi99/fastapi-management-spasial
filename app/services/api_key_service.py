@@ -12,8 +12,11 @@ def verify_api_key(
     keys = db.query(ApiKey).filter(ApiKey.is_active == True).all()
 
     for key in keys:
-        if verify_password(x_api_key, key.api_key_hash):
-            return key
+        try:
+            if key.api_key_hash and verify_password(x_api_key, key.api_key_hash):
+                return key
+        except Exception:
+            continue
 
     raise HTTPException(
         status_code=401,

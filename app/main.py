@@ -1,12 +1,15 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from routes import info, layer, workspace,  store, service, auth, coverage_store, project, api_key, endpoint_test
+from routes import info, layer, workspace, store, service, auth, coverage_store, project, api_key, endpoint_test, s2s, layer_group
 
 app = FastAPI()
 
 origins = [
     "http://localhost:5173",
-    "https://astragis.ikya.my.id"
+    "https://astragis.ikya.my.id",
+    # Domain FlowGIS — tambahkan domain FlowGIS Anda di sini jika berbeda
+    "https://flowgis.ikya.my.id",
+    "http://localhost:3000",
 ]
 
 app.add_middleware(
@@ -26,3 +29,5 @@ app.include_router(store.router)
 app.include_router(coverage_store.router)
 app.include_router(layer.router)
 app.include_router(service.router)
+app.include_router(s2s.router)
+app.include_router(layer_group.router)

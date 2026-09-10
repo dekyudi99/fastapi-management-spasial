@@ -1,0 +1,19 @@
+<layer>
+  <name>s2s_7a6df16e705f4b97bdf497c583c3ee23</name>
+  <id>LayerInfoImpl--63cfc79e:1a06429b8de:-55db</id>
+  <type>RASTER</type>
+  <defaultStyle>
+    <id>StyleInfoImpl--63cfc79e:1a06429b8de:-55da</id>
+  </defaultStyle>
+  <resource class="coverage">
+    <id>CoverageInfoImpl--63cfc79e:1a06429b8de:-55dc</id>
+  </resource>
+  <queryable>true</queryable>
+  <opaque>false</opaque>
+  <attribution>
+    <logoWidth>0</logoWidth>
+    <logoHeight>0</logoHeight>
+  </attribution>
+  <dateCreated>2026-09-10 03:49:15.174 UTC</dateCreated>
+  <dateModified>2026-09-10 03:49:16.877 UTC</dateModified>
+</layer>

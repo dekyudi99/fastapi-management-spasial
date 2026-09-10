@@ -21,6 +21,21 @@ def get_tiff_metadata(file_path: str):
             }
         }
 
+def validate_single_band(file_path: str) -> None:
+    """
+    Validasi bahwa file GeoTIFF hanya memiliki tepat 1 band.
+    Raise ValueError jika lebih dari 1 band (multi-band RGB/RGBA tidak didukung S2S endpoint).
+    """
+    with rasterio.open(file_path) as dataset:
+        band_count = dataset.count
+        if band_count != 1:
+            raise ValueError(
+                f"File GeoTIFF harus 1 band (single-band). "
+                f"File Anda memiliki {band_count} band. "
+                f"Silakan konversi ke single-band terlebih dahulu."
+            )
+
+
 import rasterio
 from rasterio.enums import ColorInterp
 

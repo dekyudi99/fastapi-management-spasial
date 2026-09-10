@@ -110,7 +110,37 @@ def list_workspaces(
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-    
+
+# Fungsi untuk melihat seluruh workspace milik user (untuk dropdown/filter)
+@router.get("/all")
+def get_all_user_workspaces(
+    current_user: Users = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    try:
+        workspaces = (
+            db.query(Workspace, Project.project_name)
+            .join(Project, Project.id == Workspace.project_id)
+            .filter(Project.user_id == current_user.id)
+            .order_by(Workspace.name.asc())
+            .all()
+        )
+        return {
+            "success": True,
+            "data": [
+                {
+                    "id": encode_id(ws.id),
+                    "raw_id": ws.id,
+                    "name": ws.name,
+                    "ws_name": ws.ws_name,
+                    "project_name": proj_name,
+                }
+                for ws, proj_name in workspaces
+            ]
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 # Fungsi untuk melihat default workspace
 @router.get("/{hashed_id}")
 def get_detail_workspace(
