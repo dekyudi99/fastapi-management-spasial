@@ -1,0 +1,41 @@
+<featureType>
+  <id>FeatureTypeInfoImpl--24ee40ec:1a09afd1299:-7f7b</id>
+  <name>geo_agriculture_area</name>
+  <nativeName>geo_agriculture_area</nativeName>
+  <namespace>
+    <id>NamespaceInfoImpl--24ee40ec:1a09afd1299:-7f86</id>
+  </namespace>
+  <title>Agriculture Area (Pertanian / Sawah)</title>
+  <keywords>
+    <string>features</string>
+    <string>geo_agriculture_area</string>
+  </keywords>
+  <srs>EPSG:4326</srs>
+  <nativeBoundingBox>
+    <minx>99.7965316772461</minx>
+    <maxx>100.35066223144531</maxx>
+    <miny>13.638228416442871</miny>
+    <maxy>14.180559158325195</maxy>
+    <crs>EPSG:4326</crs>
+  </nativeBoundingBox>
+  <latLonBoundingBox>
+    <minx>99.7965316772461</minx>
+    <maxx>100.35066223144531</maxx>
+    <miny>13.638228416442871</miny>
+    <maxy>14.180559158325195</maxy>
+    <crs>EPSG:4326</crs>
+  </latLonBoundingBox>
+  <projectionPolicy>FORCE_DECLARED</projectionPolicy>
+  <enabled>true</enabled>
+  <store class="dataStore">
+    <id>DataStoreInfoImpl--24ee40ec:1a09afd1299:-7f85</id>
+  </store>
+  <serviceConfiguration>false</serviceConfiguration>
+  <maxFeatures>0</maxFeatures>
+  <numDecimals>0</numDecimals>
+  <padWithZeros>false</padWithZeros>
+  <forcedDecimal>false</forcedDecimal>
+  <overridingServiceSRS>false</overridingServiceSRS>
+  <skipNumberMatched>false</skipNumberMatched>
+  <circularArcPresent>false</circularArcPresent>
+</featureType>

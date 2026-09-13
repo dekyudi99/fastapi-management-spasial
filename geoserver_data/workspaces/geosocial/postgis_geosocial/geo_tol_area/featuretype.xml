@@ -1,0 +1,41 @@
+<featureType>
+  <id>FeatureTypeInfoImpl--24ee40ec:1a09afd1299:-7f69</id>
+  <name>geo_tol_area</name>
+  <nativeName>geo_tol_area</nativeName>
+  <namespace>
+    <id>NamespaceInfoImpl--24ee40ec:1a09afd1299:-7f86</id>
+  </namespace>
+  <title>Toll Area (Area Tol)</title>
+  <keywords>
+    <string>features</string>
+    <string>geo_tol_area</string>
+  </keywords>
+  <srs>EPSG:4326</srs>
+  <nativeBoundingBox>
+    <minx>100.24008178710938</minx>
+    <maxx>100.24561309814453</maxx>
+    <miny>13.849961280822754</miny>
+    <maxy>13.851739883422852</maxy>
+    <crs>EPSG:4326</crs>
+  </nativeBoundingBox>
+  <latLonBoundingBox>
+    <minx>100.24008178710938</minx>
+    <maxx>100.24561309814453</maxx>
+    <miny>13.849961280822754</miny>
+    <maxy>13.851739883422852</maxy>
+    <crs>EPSG:4326</crs>
+  </latLonBoundingBox>
+  <projectionPolicy>FORCE_DECLARED</projectionPolicy>
+  <enabled>true</enabled>
+  <store class="dataStore">
+    <id>DataStoreInfoImpl--24ee40ec:1a09afd1299:-7f85</id>
+  </store>
+  <serviceConfiguration>false</serviceConfiguration>
+  <maxFeatures>0</maxFeatures>
+  <numDecimals>0</numDecimals>
+  <padWithZeros>false</padWithZeros>
+  <forcedDecimal>false</forcedDecimal>
+  <overridingServiceSRS>false</overridingServiceSRS>
+  <skipNumberMatched>false</skipNumberMatched>
+  <circularArcPresent>false</circularArcPresent>
+</featureType>

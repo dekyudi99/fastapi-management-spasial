@@ -1,0 +1,19 @@
+<layer>
+  <name>geo_tol_area</name>
+  <id>LayerInfoImpl--24ee40ec:1a09afd1299:-7f68</id>
+  <type>VECTOR</type>
+  <defaultStyle>
+    <id>StyleInfoImpl--24ee40ec:1a09afd1299:-7f67</id>
+  </defaultStyle>
+  <resource class="featureType">
+    <id>FeatureTypeInfoImpl--24ee40ec:1a09afd1299:-7f69</id>
+  </resource>
+  <queryable>true</queryable>
+  <opaque>false</opaque>
+  <attribution>
+    <logoWidth>0</logoWidth>
+    <logoHeight>0</logoHeight>
+  </attribution>
+  <dateCreated>2026-09-13 15:55:16.188 UTC</dateCreated>
+  <dateModified>2026-09-13 15:55:19.326 UTC</dateModified>
+</layer>

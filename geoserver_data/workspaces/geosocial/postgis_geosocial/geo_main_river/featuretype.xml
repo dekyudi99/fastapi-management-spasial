@@ -1,0 +1,41 @@
+<featureType>
+  <id>FeatureTypeInfoImpl--24ee40ec:1a09afd1299:-7f81</id>
+  <name>geo_main_river</name>
+  <nativeName>geo_main_river</nativeName>
+  <namespace>
+    <id>NamespaceInfoImpl--24ee40ec:1a09afd1299:-7f86</id>
+  </namespace>
+  <title>Main River (Sungai Utama)</title>
+  <keywords>
+    <string>features</string>
+    <string>geo_main_river</string>
+  </keywords>
+  <srs>EPSG:4326</srs>
+  <nativeBoundingBox>
+    <minx>99.80220031738281</minx>
+    <maxx>100.28414916992188</maxx>
+    <miny>13.618355751037598</miny>
+    <maxy>14.201627731323242</maxy>
+    <crs>EPSG:4326</crs>
+  </nativeBoundingBox>
+  <latLonBoundingBox>
+    <minx>99.80220031738281</minx>
+    <maxx>100.28414916992188</maxx>
+    <miny>13.618355751037598</miny>
+    <maxy>14.201627731323242</maxy>
+    <crs>EPSG:4326</crs>
+  </latLonBoundingBox>
+  <projectionPolicy>FORCE_DECLARED</projectionPolicy>
+  <enabled>true</enabled>
+  <store class="dataStore">
+    <id>DataStoreInfoImpl--24ee40ec:1a09afd1299:-7f85</id>
+  </store>
+  <serviceConfiguration>false</serviceConfiguration>
+  <maxFeatures>0</maxFeatures>
+  <numDecimals>0</numDecimals>
+  <padWithZeros>false</padWithZeros>
+  <forcedDecimal>false</forcedDecimal>
+  <overridingServiceSRS>false</overridingServiceSRS>
+  <skipNumberMatched>false</skipNumberMatched>
+  <circularArcPresent>false</circularArcPresent>
+</featureType>

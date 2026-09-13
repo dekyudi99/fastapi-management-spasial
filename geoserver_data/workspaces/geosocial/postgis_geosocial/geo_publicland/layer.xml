@@ -1,0 +1,19 @@
+<layer>
+  <name>geo_publicland</name>
+  <id>LayerInfoImpl--24ee40ec:1a09afd1299:-7f6e</id>
+  <type>VECTOR</type>
+  <defaultStyle>
+    <id>StyleInfoImpl--24ee40ec:1a09afd1299:-7f6d</id>
+  </defaultStyle>
+  <resource class="featureType">
+    <id>FeatureTypeInfoImpl--24ee40ec:1a09afd1299:-7f6f</id>
+  </resource>
+  <queryable>true</queryable>
+  <opaque>false</opaque>
+  <attribution>
+    <logoWidth>0</logoWidth>
+    <logoHeight>0</logoHeight>
+  </attribution>
+  <dateCreated>2026-09-13 15:55:07.45 UTC</dateCreated>
+  <dateModified>2026-09-13 15:55:09.957 UTC</dateModified>
+</layer>

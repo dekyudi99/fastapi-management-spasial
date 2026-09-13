@@ -1,0 +1,19 @@
+<layer>
+  <name>geo_main_river</name>
+  <id>LayerInfoImpl--24ee40ec:1a09afd1299:-7f80</id>
+  <type>VECTOR</type>
+  <defaultStyle>
+    <id>StyleInfoImpl--24ee40ec:1a09afd1299:-7f7f</id>
+  </defaultStyle>
+  <resource class="featureType">
+    <id>FeatureTypeInfoImpl--24ee40ec:1a09afd1299:-7f81</id>
+  </resource>
+  <queryable>true</queryable>
+  <opaque>false</opaque>
+  <attribution>
+    <logoWidth>0</logoWidth>
+    <logoHeight>0</logoHeight>
+  </attribution>
+  <dateCreated>2026-09-13 15:54:11.425 UTC</dateCreated>
+  <dateModified>2026-09-13 15:54:13.874 UTC</dateModified>
+</layer>
