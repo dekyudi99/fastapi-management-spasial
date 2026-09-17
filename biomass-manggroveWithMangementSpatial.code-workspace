@@ -1,0 +1,28 @@
+{
+	"folders": [
+		{
+			"path": "../biomass-manggrove"
+		},
+		{
+			"path": "."
+		},
+		{
+			"path": "../frontend-management-spasial"
+		},
+		{
+			"path": "../FlowGIS"
+		}
+	],
+	"settings": {
+		"python.defaultInterpreterPath": "C:\\Users\\USER\\AppData\\Local\\Python\\bin\\python.exe",
+		"python.pyrefly.configPath": "${workspaceFolder:fastapi-management-spasial}/pyrefly.toml",
+		"python.analysis.extraPaths": [
+			"./app",
+			"${workspaceFolder:fastapi-management-spasial}/app"
+		],
+		"python.analysis.diagnosticSeverityOverrides": {
+			"reportMissingImports": "none",
+			"reportMissingModuleSource": "none"
+		}
+	}
+}

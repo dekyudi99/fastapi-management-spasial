@@ -9,13 +9,13 @@
   </mimeFormats>
   <gridSubsets>
     <gridSubset>
-      <gridSetName>EPSG:4326</gridSetName>
+      <gridSetName>WebMercatorQuad</gridSetName>
       <extent>
         <coords>
-          <double>99.89760032815346</double>
-          <double>13.69086391915198</double>
-          <double>100.13286910106436</double>
-          <double>13.944458323858921</double>
+          <double>1.1120550000000002E7</double>
+          <double>1538773.836316079</double>
+          <double>1.1146740000000002E7</double>
+          <double>1567845.1658676213</double>
         </coords>
       </extent>
     </gridSubset>
@@ -31,13 +31,13 @@
       </extent>
     </gridSubset>
     <gridSubset>
-      <gridSetName>WebMercatorQuad</gridSetName>
+      <gridSetName>EPSG:4326</gridSetName>
       <extent>
         <coords>
-          <double>1.1120550000000002E7</double>
-          <double>1538773.836316079</double>
-          <double>1.1146740000000002E7</double>
-          <double>1567845.1658676213</double>
+          <double>99.89760032815346</double>
+          <double>13.69086391915198</double>
+          <double>100.13286910106436</double>
+          <double>13.944458323858921</double>
         </coords>
       </extent>
     </gridSubset>

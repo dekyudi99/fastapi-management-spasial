@@ -1,0 +1,9 @@
+preset = "basic"
+project-includes = [
+    "**/*.py",
+]
+search-path = [
+    ".",
+    "app",
+]
+python-interpreter-path = "C:\\Users\\USER\\AppData\\Local\\Python\\bin\\python.exe"

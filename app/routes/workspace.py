@@ -70,7 +70,7 @@ def list_workspaces(
     try:
         id = decode_id(hashed_id)
 
-        total_count = db.query(func.count(Workspace.id)).join(Project).filter(Project.user_id == current_user.id).scalar()
+        total_count = db.query(func.count(Workspace.id)).join(Project).filter(Project.id == id, Project.user_id == current_user.id).scalar()
                 
         offset = (page - 1) * size
 

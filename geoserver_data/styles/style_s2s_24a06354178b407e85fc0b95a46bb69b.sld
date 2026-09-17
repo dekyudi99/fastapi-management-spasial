@@ -3,18 +3,17 @@
     <sld:Name>Default Styler</sld:Name>
     <sld:UserStyle>
       <sld:Name>Default Styler</sld:Name>
-      <sld:Title>FloodRisk Style</sld:Title>
+      <sld:Title>style_s2s_24a06354178b407e85fc0b95a46bb69b</sld:Title>
       <sld:FeatureTypeStyle>
         <sld:Name>name</sld:Name>
         <sld:Rule>
           <sld:RasterSymbolizer>
             <sld:ColorMap type="values">
-              <sld:ColorMapEntry color="#000000" opacity="0.0" quantity="0" label="No Data"/>
-              <sld:ColorMapEntry color="#0000FF" opacity="1.0" quantity="1" label="Very Low (1)"/>
-              <sld:ColorMapEntry color="#00FFFF" opacity="1.0" quantity="2" label="Low (2)"/>
-              <sld:ColorMapEntry color="#00FF00" opacity="1.0" quantity="3" label="Moderate (3)"/>
-              <sld:ColorMapEntry color="#FFFF00" opacity="1.0" quantity="4" label="High (4)"/>
-              <sld:ColorMapEntry color="#FF0000" opacity="1.0" quantity="5" label="Critical (5)"/>
+              <sld:ColorMapEntry color="#10b981" opacity="1.0" quantity="1.0" label="Sangat Rendah"/>
+              <sld:ColorMapEntry color="#84cc16" opacity="1.0" quantity="2.0" label="Rendah"/>
+              <sld:ColorMapEntry color="#eab308" opacity="1.0" quantity="3.0" label="Sedang"/>
+              <sld:ColorMapEntry color="#f97316" opacity="1.0" quantity="4.0" label="Tinggi"/>
+              <sld:ColorMapEntry color="#ef4444" opacity="1.0" quantity="5.0" label="Sangat Tinggi"/>
             </sld:ColorMap>
             <sld:ContrastEnhancement/>
           </sld:RasterSymbolizer>

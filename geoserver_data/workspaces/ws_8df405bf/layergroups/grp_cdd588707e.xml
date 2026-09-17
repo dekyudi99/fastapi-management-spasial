@@ -1,5 +1,5 @@
 <layerGroup>
-  <id>LayerGroupInfoImpl--24ee40ec:1a09b95963e:6953</id>
+  <id>LayerGroupInfoImpl--377748b4:1a0a8a9e835:-7e85</id>
   <name>grp_cdd588707e</name>
   <mode>SINGLE</mode>
   <title>group1</title>
@@ -9,10 +9,10 @@
   </workspace>
   <publishables>
     <published type="layer">
-      <id>LayerInfoImpl--63cfc79e:1a06429b8de:-5615</id>
+      <id>LayerInfoImpl--63cfc79e:1a06429b8de:-56aa</id>
     </published>
     <published type="layer">
-      <id>LayerInfoImpl--63cfc79e:1a06429b8de:-56aa</id>
+      <id>LayerInfoImpl--63cfc79e:1a06429b8de:-5615</id>
     </published>
   </publishables>
   <styles>
@@ -26,9 +26,5 @@
     <maxy>13.944458323858921</maxy>
     <crs>EPSG:4326</crs>
   </bounds>
-  <keywords>
-    <string>s2s</string>
-    <string>flowgis</string>
-  </keywords>
-  <dateCreated>2026-09-14 02:12:51.935 UTC</dateCreated>
+  <dateCreated>2026-09-16 05:25:30.111 UTC</dateCreated>
 </layerGroup>

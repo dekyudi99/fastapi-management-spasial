@@ -47,14 +47,16 @@ def create_or_update_style(style_name: str, sld_xml: str) -> bool:
     pw = os.getenv("GEOSERVER_PASS", "rahasia")
     auth = HTTPBasicAuth(user, pw)
     
-    style_url = f"{geoserver_url}/rest/styles/{style_name}"
+    # Bersihkan nama style dari ekstensi agar GeoServer tidak keliru membaca format URL
+    clean_name = os.path.splitext(style_name)[0].replace('.', '_')
+    style_url = f"{geoserver_url}/rest/styles/{clean_name}"
     style_check = requests.get(f"{style_url}.json", auth=auth)
     
     if style_check.status_code == 404:
         create_res = requests.post(
             f"{geoserver_url}/rest/styles",
             headers={"Content-Type": "text/xml"},
-            data=f"<style><name>{style_name}</name><filename>{style_name}.sld</filename></style>",
+            data=f"<style><name>{clean_name}</name><filename>{clean_name}.sld</filename></style>",
             auth=auth
         )
         if create_res.status_code not in (200, 201):
@@ -74,11 +76,12 @@ def create_or_update_style(style_name: str, sld_xml: str) -> bool:
 
 def style_exists_in_geoserver(style_name: str) -> bool:
     """Cek apakah style tertentu sudah ada di GeoServer."""
+    clean_name = os.path.splitext(style_name)[0].replace('.', '_')
     geoserver_url = os.getenv("GEOSERVER_URL", "http://geoserver:8080/geoserver")
     user = os.getenv("GEOSERVER_USER", "admin")
     pw = os.getenv("GEOSERVER_PASS", "rahasia")
     auth = HTTPBasicAuth(user, pw)
-    res = requests.get(f"{geoserver_url}/rest/styles/{style_name}.json", auth=auth)
+    res = requests.get(f"{geoserver_url}/rest/styles/{clean_name}.json", auth=auth)
     return res.status_code == 200
 
 
@@ -88,15 +91,31 @@ def assign_style_to_layer(workspace: str, layer_name: str, style_name: str) -> b
     pw = os.getenv("GEOSERVER_PASS", "rahasia")
     auth = HTTPBasicAuth(user, pw)
 
-    # Verifikasi style ada di GeoServer sebelum assign
-    # Jika tidak ada, gunakan style bawaan GeoServer 'raster' yang selalu tersedia
-    if not style_exists_in_geoserver(style_name):
-        raise Exception(f"Style '{style_name}' tidak ditemukan di GeoServer. Gunakan apply_sld_to_layer untuk membuat style baru terlebih dahulu.")
+    clean_style = os.path.splitext(style_name)[0].replace('.', '_')
 
+    # Verifikasi style ada di GeoServer sebelum assign
+    if not style_exists_in_geoserver(clean_style):
+        raise Exception(f"Style '{clean_style}' tidak ditemukan di GeoServer.")
+
+    # 1. Coba assign via JSON ke endpoint workspace (kebal dari nama layer yang mengandung ekstensi .tif)
+    try:
+        ws_assign_url = f"{geoserver_url}/rest/workspaces/{workspace}/layers/{layer_name}.json"
+        assign_res = requests.put(
+            ws_assign_url,
+            headers={"Content-Type": "application/json"},
+            json={"layer": {"defaultStyle": {"name": clean_style}}},
+            auth=auth
+        )
+        if assign_res.status_code in (200, 201):
+            return True
+    except Exception:
+        pass
+
+    # 2. Fallback via XML ke global layers endpoint
     layer_xml = f"""
     <layer>
         <defaultStyle>
-            <name>{style_name}</name>
+            <name>{clean_style}</name>
         </defaultStyle>
     </layer>
     """
