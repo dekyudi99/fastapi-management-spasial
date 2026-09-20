@@ -309,8 +309,36 @@ async def s2s_download_layer(
                 )
 
             media_type = "image/tiff" if is_tiff else "image/png"
+            output_content = resp.content
+
+            # Jika format PNG dan memiliki colormap palette (PNG8), konversi ke 32-bit RGBA murni
+            # agar kompatibel dengan seluruh image viewer di Windows (Photos, Paint) dan tidak blank/hitam
+            if not is_tiff and len(output_content) > 0:
+                try:
+                    import io
+                    import rasterio
+                    import numpy as np
+                    with rasterio.open(io.BytesIO(output_content)) as src:
+                        if src.count == 1 and src.colormap(1):
+                            data = src.read(1)
+                            cm = src.colormap(1)
+                            h, w = src.height, src.width
+                            rgba = np.zeros((h, w, 4), dtype=np.uint8)
+                            for k, v in cm.items():
+                                rgba[data == k] = v
+                            
+                            prof = src.profile.copy()
+                            prof.update(driver='PNG', count=4, dtype='uint8', nodata=None)
+                            out_buf = io.BytesIO()
+                            with rasterio.open(out_buf, 'w', **prof) as dst:
+                                for band_idx in range(4):
+                                    dst.write(rgba[:, :, band_idx], band_idx + 1)
+                            output_content = out_buf.getvalue()
+                except Exception as conv_err:
+                    print(f"Warning: Gagal konversi PNG ke RGBA: {conv_err}")
+
             return Response(
-                content=resp.content,
+                content=output_content,
                 media_type=media_type,
                 headers={
                     "Content-Disposition": f'attachment; filename="{filename}"',
