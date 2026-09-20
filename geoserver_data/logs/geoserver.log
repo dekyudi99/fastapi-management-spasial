@@ -1355,3 +1355,4 @@ DEBUG 2026-09-19 15:58:03,892 [main][Log4J2Logger.java:215] : CONFIGURING GEOSER
 19 Sep 15:58:35 CONFIG [diskquota.DiskQuotaMonitor] - 65 layers attached to global quota 20.0 GB
 19 Sep 15:58:35 CONFIG [diskquota.DiskQuotaMonitor] - Disk quota periodic enforcement task set up every 5 SECONDS
 19 Sep 15:58:37 CONFIG [geoserver.security] - Start reloading user/groups for service named default
+19 Sep 15:58:37 CONFIG [geoserver.security] - Reloading user/groups successful for service named default
