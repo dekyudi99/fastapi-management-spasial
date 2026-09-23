@@ -10,6 +10,9 @@ import uuid
 import json
 import re
 import httpx
+from dotenv import load_dotenv
+
+load_dotenv()
 
 from config.database import get_db
 from config.geoserver_auth import get_geoserver_connection

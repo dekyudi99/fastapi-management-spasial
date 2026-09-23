@@ -13,6 +13,9 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func, text
 from geoalchemy2.functions import ST_AsGeoJSON, ST_XMin, ST_YMin, ST_XMax, ST_YMax
 import os
+from dotenv import load_dotenv
+
+load_dotenv()
 from datetime import datetime
 import re
 import shutil

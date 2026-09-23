@@ -3,6 +3,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from routes import info, layer, workspace, store, service, auth, coverage_store, project, api_key, endpoint_test, s2s, layer_group
 
 import os
+from dotenv import load_dotenv
+
+load_dotenv()
 
 app = FastAPI()
 

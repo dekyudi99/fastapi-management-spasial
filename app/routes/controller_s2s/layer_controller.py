@@ -3,13 +3,13 @@ from fastapi.responses import Response, FileResponse
 from typing import Optional, List
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
-from sqlalchemy import func
+from sqlalchemy import func, text
 import os
 import secrets
 import re
 import httpx
 
-from config.database import get_db
+from config.database import get_db, engine
 from config.geoserver_auth import get_geoserver_connection
 from models.layer import Layer
 from models.workspace import Workspace
@@ -93,6 +93,7 @@ def s2s_get_layers(
                 "workspace_name": ws_name,
                 "workspace_display_name": ws_display,
                 "client_user_id": layer.client_user_id,
+                "layer_type": layer.layer_type,
                 "data_type": layer.data_type,
                 "epsg": layer.epsg,
                 "bbox": [minx, miny, maxx, maxy] if minx is not None else None,
@@ -168,12 +169,31 @@ async def s2s_delete_layer(
 
         workspace = db.query(Workspace).filter(Workspace.id == layer.workspace_id).first()
 
-        # 1. Hapus dari GeoServer
+        # 1. Hapus dari GeoServer & PostGIS jika ada
         if workspace and layer.geoserver_name:
-            try:
-                geo.delete_coveragestore(coveragestore_name=layer.geoserver_name, workspace=workspace.ws_name)
-            except Exception as ge:
-                print(f"[S2S] Peringatan: Gagal menghapus coverage store GeoServer: {ge}")
+            if layer.layer_type == "vector":
+                try:
+                    with engine.begin() as conn:
+                        conn.execute(text(f'DROP TABLE IF EXISTS public."{layer.geoserver_name}" CASCADE;'))
+                except Exception as de:
+                    print(f"[S2S] Peringatan: Gagal menghapus tabel PostGIS: {de}")
+                try:
+                    actual_store = "postgis_geosocial" if workspace.ws_name == "geosocial" else "postgis_store"
+                    geoserver_url = (os.getenv("GEOSERVER_URL") or "").rstrip("/")
+                    user = os.getenv("GEOSERVER_USER", "admin")
+                    password = os.getenv("GEOSERVER_PASS", "geoserver")
+                    httpx.delete(
+                        f"{geoserver_url}/rest/workspaces/{workspace.ws_name}/datastores/{actual_store}/featuretypes/{layer.geoserver_name}?recurse=true",
+                        auth=(user, password),
+                        timeout=15.0
+                    )
+                except Exception as fe:
+                    print(f"[S2S] Peringatan: Gagal menghapus featuretype GeoServer: {fe}")
+            else:
+                try:
+                    geo.delete_coveragestore(coveragestore_name=layer.geoserver_name, workspace=workspace.ws_name)
+                except Exception as ge:
+                    print(f"[S2S] Peringatan: Gagal menghapus coverage store GeoServer: {ge}")
             try:
                 geo.delete_style(style_name=f"style_{layer.geoserver_name}")
             except Exception:
