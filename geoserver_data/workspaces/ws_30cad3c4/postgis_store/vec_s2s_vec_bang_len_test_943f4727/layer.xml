@@ -1,0 +1,19 @@
+<layer>
+  <name>vec_s2s_vec_bang_len_test_943f4727</name>
+  <id>LayerInfoImpl-36837126:1a0cc1deb7b:2f1b</id>
+  <type>VECTOR</type>
+  <defaultStyle>
+    <id>StyleInfoImpl-36837126:1a0cc1deb7b:2f1c</id>
+  </defaultStyle>
+  <resource class="featureType">
+    <id>FeatureTypeInfoImpl-36837126:1a0cc1deb7b:2f1a</id>
+  </resource>
+  <queryable>true</queryable>
+  <opaque>false</opaque>
+  <attribution>
+    <logoWidth>0</logoWidth>
+    <logoHeight>0</logoHeight>
+  </attribution>
+  <dateCreated>2026-09-23 07:32:38.326 UTC</dateCreated>
+  <dateModified>2026-09-23 07:32:39.161 UTC</dateModified>
+</layer>

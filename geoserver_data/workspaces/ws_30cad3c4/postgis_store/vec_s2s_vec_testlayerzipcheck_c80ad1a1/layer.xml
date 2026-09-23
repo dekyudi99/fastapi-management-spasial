@@ -1,0 +1,19 @@
+<layer>
+  <name>vec_s2s_vec_testlayerzipcheck_c80ad1a1</name>
+  <id>LayerInfoImpl-36837126:1a0cc1deb7b:2f0e</id>
+  <type>VECTOR</type>
+  <defaultStyle>
+    <id>StyleInfoImpl-36837126:1a0cc1deb7b:2f0f</id>
+  </defaultStyle>
+  <resource class="featureType">
+    <id>FeatureTypeInfoImpl-36837126:1a0cc1deb7b:2f0d</id>
+  </resource>
+  <queryable>true</queryable>
+  <opaque>false</opaque>
+  <attribution>
+    <logoWidth>0</logoWidth>
+    <logoHeight>0</logoHeight>
+  </attribution>
+  <dateCreated>2026-09-23 07:25:15.293 UTC</dateCreated>
+  <dateModified>2026-09-23 07:25:16.366 UTC</dateModified>
+</layer>
