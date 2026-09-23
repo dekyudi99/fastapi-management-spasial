@@ -160,7 +160,7 @@ async def s2s_create_layer_group(
             if bbox_res and bbox_res[0] is not None:
                 top_bbox = [bbox_res[0], bbox_res[1], bbox_res[2], bbox_res[3]]
 
-        wms_base = (os.getenv("GEOSERVER_WMS_URL") or "http://localhost:8080/geoserver").rstrip("/")
+        wms_base = (os.getenv("GEOSERVER_WMS_URL") or "").rstrip("/")
         wms_url = f"{wms_base}/{workspace.ws_name}/wms"
 
         create_log(
@@ -213,7 +213,7 @@ async def s2s_list_layer_groups(
     db: Session = Depends(get_db),
 ):
     try:
-        wms_base = (os.getenv("GEOSERVER_WMS_URL") or "http://localhost:8080/geoserver").rstrip("/")
+        wms_base = (os.getenv("GEOSERVER_WMS_URL") or "").rstrip("/")
 
         query = (
             db.query(LayerGroup, Workspace.ws_name, Workspace.name.label("ws_display"))
@@ -436,7 +436,7 @@ async def s2s_update_layer_group(
             meta_data={"layer_group_id": grp.id, "title": grp.title, "layer_count": len(req.layer_ids) if req.layer_ids else None}
         )
 
-        wms_base = (os.getenv("GEOSERVER_WMS_URL") or "http://localhost:8080/geoserver").rstrip("/")
+        wms_base = (os.getenv("GEOSERVER_WMS_URL") or "").rstrip("/")
         bbox_val = None
         first_lgl = (
             db.query(LayerGroupLayer)

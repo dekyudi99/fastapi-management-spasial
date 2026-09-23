@@ -1,0 +1,24 @@
+<dataStore>
+  <id>DataStoreInfoImpl-36837126:1a0cc11f503:-7968</id>
+  <name>postgis_store</name>
+  <type>PostGIS</type>
+  <enabled>true</enabled>
+  <workspace>
+    <id>WorkspaceInfoImpl-3a7365dc:1a02f1b2848:-7ffe</id>
+  </workspace>
+  <connectionParameters>
+    <entry key="schema">public</entry>
+    <entry key="database">spasial_db</entry>
+    <entry key="port">5432</entry>
+    <entry key="passwd">crypt2:s0Jt0bGqTwzsfen26mq64aSrChqqJYGZkMOM7KV1/b0=</entry>
+    <entry key="Expose primary keys">true</entry>
+    <entry key="validate connections">true</entry>
+    <entry key="host">db</entry>
+    <entry key="dbtype">postgis</entry>
+    <entry key="namespace">http://ws_8df405bf</entry>
+    <entry key="user">postgres</entry>
+  </connectionParameters>
+  <__default>false</__default>
+  <dateCreated>2026-09-23 02:22:54.541 UTC</dateCreated>
+  <disableOnConnFailure>false</disableOnConnFailure>
+</dataStore>

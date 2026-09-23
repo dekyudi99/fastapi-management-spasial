@@ -28,11 +28,20 @@ from services.sld_to_layer import (
     style_exists_in_geoserver,
 )
 
+from services.vector_service import (
+    read_vector_file_to_gdf,
+    simplify_vector_gdf,
+    publish_vector_to_geoserver_postgis,
+)
+
 router = APIRouter()
 geo = get_geoserver_connection()
 
 RASTER_PATH = "/data_raster"
+VECTOR_PATH = "/data_vector"
 os.makedirs(RASTER_PATH, exist_ok=True)
+os.makedirs(VECTOR_PATH, exist_ok=True)
+VECTOR_FORMATS = ('.shp', '.zip', '.geojson', '.json', '.gpkg', '.csv')
 
 
 # ── Pydantic Request Models ───────────────────────────────────────────────────
@@ -383,7 +392,7 @@ async def s2s_publish_from_url(
             }
         )
 
-        wms_base = (os.getenv("GEOSERVER_WMS_URL") or "http://localhost:8080/geoserver").rstrip("/")
+        wms_base = (os.getenv("GEOSERVER_WMS_URL")).rstrip("/")
         wms_url = f"{wms_base}/{workspace.ws_name}/wms"
 
         return {
@@ -583,7 +592,7 @@ async def s2s_publish_layer(
             meta_data={"workspace_id": workspace.id, "file_name": file.filename}
         )
 
-        wms_base = (os.getenv("GEOSERVER_WMS_URL") or "http://localhost:8080/geoserver").rstrip("/")
+        wms_base = (os.getenv("GEOSERVER_WMS_URL")).rstrip("/")
         wms_url = f"{wms_base}/{workspace.ws_name}/wms"
 
         return {
@@ -613,3 +622,185 @@ async def s2s_publish_layer(
         if file_path and os.path.exists(file_path):
             os.remove(file_path)
         raise HTTPException(status_code=500, detail=f"Terjadi kesalahan internal: {e}")
+
+
+# ── 3. POST /publish-vector (S2S Vector Upload via File Upload) ────────────────
+
+@router.post("/publish-vector", status_code=status.HTTP_201_CREATED)
+async def s2s_publish_vector_layer(
+    workspace_id: str = Form(..., description="Hashed ID, integer ID, atau nama workspace tujuan"),
+    layer_name: str = Form(..., description="Nama tampilan layer"),
+    description: Optional[str] = Form("", description="Deskripsi layer"),
+    file: UploadFile = File(..., description="File spasial vektor (.zip Shapefile, .geojson, .gpkg, .csv, .shp)"),
+    client_user_id: Optional[str] = Form(None, description="ID user klien (contoh: ID pengguna Laravel)"),
+    client_user_email: Optional[str] = Form(None, description="Email user klien"),
+    client_user_name: Optional[str] = Form(None, description="Nama user klien"),
+    metadata_json: Optional[str] = Form(None, description="JSON string metadata kustom"),
+    request: Request = None,
+    api_key: ApiKey = Depends(verify_api_key),
+    db: Session = Depends(get_db),
+):
+    """
+    ## Publish Vector Layer via S2S File Upload
+    Mengunggah berkas vektor (Shapefile zip, GeoJSON, GPKG, CSV), melakukan simplifikasi
+    dengan nilai toleransi tetap dari environment (SIMPLIFY_TOLERANCE), menyimpan ke PostGIS,
+    dan menerbitkan FeatureType WMS ke GeoServer.
+    """
+    client_ip = request.client.host if request and request.client else None
+    user_agent = request.headers.get("user-agent") if request else None
+    file_path = None
+
+    try:
+        # Cari workspace berdasarkan integer ID, decode hash ID, atau nama workspace
+        workspace = None
+        if str(workspace_id).isdigit():
+            workspace = (
+                db.query(Workspace)
+                .join(Project)
+                .filter(Workspace.id == int(workspace_id), Project.id == api_key.project_id)
+                .first()
+            )
+        else:
+            actual_ws_id = decode_id(workspace_id)
+            if actual_ws_id is not None:
+                workspace = (
+                    db.query(Workspace)
+                    .join(Project)
+                    .filter(Workspace.id == actual_ws_id, Project.id == api_key.project_id)
+                    .first()
+                )
+            if not workspace:
+                # Coba cari berdasarkan nama workspace (contoh: "geosocial")
+                workspace = (
+                    db.query(Workspace)
+                    .filter(Workspace.ws_name == str(workspace_id).strip())
+                    .first()
+                )
+
+        if workspace is None:
+            raise HTTPException(status_code=403, detail="Workspace tidak ditemukan atau API Key tidak memiliki akses.")
+
+        file_extension = os.path.splitext(file.filename or "")[1].lower()
+        if file_extension not in VECTOR_FORMATS:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Format berkas '{file_extension}' tidak didukung! Format yang didukung: {', '.join(VECTOR_FORMATS)}"
+            )
+
+        clean_slug = re.sub(r'[^a-zA-Z0-9_]', '_', layer_name.lower()).strip('_')[:20]
+        store_name = f"s2s_vec_{clean_slug}_{uuid.uuid4().hex[:8]}"
+        unique_filename = f"{store_name}{file_extension}"
+        file_path = os.path.normpath(os.path.join(VECTOR_PATH, unique_filename))
+
+        with open(file_path, "wb") as buffer:
+            shutil.copyfileobj(file.file, buffer)
+
+        # Baca file ke GeoPandas GeoDataFrame
+        gdf, format_name = read_vector_file_to_gdf(file_path)
+
+        # Toleransi simplifikasi diambil dari environment secara tetap (user tidak bisa mengubah)
+        env_tolerance = os.getenv("SIMPLIFY_TOLERANCE")
+        if not env_tolerance:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Variabel environment SIMPLIFY_TOLERANCE belum disetel."
+            )
+        simplify_tolerance = float(env_tolerance)
+
+        gdf, stats = simplify_vector_gdf(gdf, tolerance=simplify_tolerance, preserve_topology=True)
+
+        # Ambil Bounding Box dari data vektor
+        total_bounds = gdf.total_bounds
+        geom = box(
+            float(total_bounds[0]),
+            float(total_bounds[1]),
+            float(total_bounds[2]),
+            float(total_bounds[3])
+        )
+
+        # Publikasikan ke PostGIS dan GeoServer FeatureType
+        dominant_geom = stats.get("geometry_type", "Polygon")
+        table_name = f"vec_{store_name}"
+        publish_vector_to_geoserver_postgis(
+            gdf=gdf,
+            table_name=table_name,
+            workspace_name=workspace.ws_name,
+            title=layer_name,
+            geom_type=dominant_geom
+        )
+
+        # Parse extra metadata jika ada
+        parsed_meta = None
+        if metadata_json:
+            try:
+                parsed_meta = json.loads(metadata_json)
+            except Exception:
+                parsed_meta = {"raw": metadata_json}
+
+        full_metadata = {
+            "simplification": stats,
+            "extra": parsed_meta
+        }
+
+        layer_meta = Layer(
+            workspace_id=workspace.id,
+            name=layer_name,
+            description=description,
+            geoserver_name=table_name,
+            epsg=4326,
+            bbox=from_shape(geom, srid=4326),
+            width=None,
+            height=None,
+            layer_type="vector",
+            data_type=format_name,
+            file_path=file_path,
+            status="PUBLISHED",
+            metadata_json=full_metadata
+        )
+
+        db.add(layer_meta)
+        db.commit()
+        db.refresh(layer_meta)
+
+        wms_base = (os.getenv("GEOSERVER_WMS_URL")).rstrip("/")
+        wms_url = f"{wms_base}/{workspace.ws_name}/wms"
+        full_layer_name = f"{workspace.ws_name}:{table_name}"
+
+        create_log(
+            db=db,
+            auth_type="API_KEY",
+            action="S2S_PUBLISH_VECTOR_LAYER",
+            resource_type="LAYER",
+            resource_id=layer_meta.id,
+            ip_address=client_ip,
+            user_agent=user_agent,
+            meta_data={"layer_name": layer_name, "table_name": table_name, "format": format_name}
+        )
+
+        return {
+            "success": True,
+            "message": f"Layer vektor '{layer_name}' berhasil disederhanakan dan dipublikasikan via S2S!",
+            "data": {
+                "id": layer_meta.id,
+                "layer_name": full_layer_name,
+                "display_name": layer_name,
+                "geoserver_name": table_name,
+                "workspace": workspace.ws_name,
+                "type": "vector",
+                "geom_type": dominant_geom,
+                "data_type": format_name,
+                "wms_url": wms_url,
+                "wms_layers_param": full_layer_name,
+                "bbox": [float(total_bounds[0]), float(total_bounds[1]), float(total_bounds[2]), float(total_bounds[3])],
+                "simplification": stats,
+                "created_at": layer_meta.created_at,
+            }
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        if file_path and os.path.exists(file_path):
+            os.remove(file_path)
+        raise HTTPException(status_code=500, detail=f"Terjadi kesalahan internal upload vektor: {e}")

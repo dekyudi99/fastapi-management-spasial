@@ -1,9 +1,10 @@
 <GeoServerTileLayer>
-  <id>LayerInfoImpl--377748b4:1a0a8a9e835:1249</id>
+  <id>LayerInfoImpl-36837126:1a0c7d58e27:-1112</id>
   <enabled>true</enabled>
   <inMemoryCached>true</inMemoryCached>
-  <name>ws_dc4c8fa5:s2s_511c5e59070d49bf94077054a2561a12</name>
+  <name>ws_f9866f09:vec_artana_11d8bd2473</name>
   <mimeFormats>
+    <string>application/vnd.mapbox-vector-tile</string>
     <string>image/png</string>
     <string>image/jpeg</string>
   </mimeFormats>
@@ -12,10 +13,10 @@
       <gridSetName>EPSG:4326</gridSetName>
       <extent>
         <coords>
-          <double>115.16797201137278</double>
-          <double>-8.785343815632096</double>
-          <double>115.21755901505618</double>
-          <double>-8.715454886527597</double>
+          <double>99.7965316772461</double>
+          <double>13.638228416442871</double>
+          <double>100.35066223144531</double>
+          <double>14.180559158325195</double>
         </coords>
       </extent>
     </gridSubset>
@@ -23,10 +24,10 @@
       <gridSetName>EPSG:900913</gridSetName>
       <extent>
         <coords>
-          <double>1.282044E7</double>
-          <double>-981834.9047524373</double>
-          <double>1.2825960000000002E7</double>
-          <double>-973963.2821029905</double>
+          <double>1.110929908924583E7</double>
+          <double>1532743.801523088</double>
+          <double>1.1170984620372282E7</double>
+          <double>1594939.8048449517</double>
         </coords>
       </extent>
     </gridSubset>
@@ -34,10 +35,10 @@
       <gridSetName>WebMercatorQuad</gridSetName>
       <extent>
         <coords>
-          <double>1.282044E7</double>
-          <double>-981834.9047524373</double>
-          <double>1.2825960000000002E7</double>
-          <double>-973963.2821029905</double>
+          <double>1.110929908924583E7</double>
+          <double>1532743.801523088</double>
+          <double>1.1170984620372282E7</double>
+          <double>1594939.8048449517</double>
         </coords>
       </extent>
     </gridSubset>
@@ -45,10 +46,10 @@
       <gridSetName>WebMercatorQuadx2</gridSetName>
       <extent>
         <coords>
-          <double>1.282044E7</double>
-          <double>-981834.9047524373</double>
-          <double>1.2825960000000002E7</double>
-          <double>-973963.2821029905</double>
+          <double>1.110929908924583E7</double>
+          <double>1532743.801523088</double>
+          <double>1.1170984620372282E7</double>
+          <double>1594939.8048449517</double>
         </coords>
       </extent>
     </gridSubset>
@@ -64,7 +65,7 @@
       <key>STYLES</key>
       <defaultValue></defaultValue>
       <availableStyles class="sorted-set"/>
-      <defaultStyle>style_s2s_511c5e59070d49bf94077054a2561a12</defaultStyle>
+      <defaultStyle>style_vec_artana_11d8bd2473</defaultStyle>
     </styleParameterFilter>
   </parameterFilters>
   <gutter>0</gutter>

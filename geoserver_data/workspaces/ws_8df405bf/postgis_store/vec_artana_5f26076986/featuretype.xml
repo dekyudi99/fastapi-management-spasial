@@ -1,0 +1,41 @@
+<featureType>
+  <id>FeatureTypeInfoImpl-36837126:1a0cc11f503:-7967</id>
+  <name>vec_artana_5f26076986</name>
+  <nativeName>vec_artana_5f26076986</nativeName>
+  <namespace>
+    <id>NamespaceInfoImpl-3a7365dc:1a02f1b2848:-7ffd</id>
+  </namespace>
+  <title>flase</title>
+  <keywords>
+    <string>vec_artana_5f26076986</string>
+    <string>features</string>
+  </keywords>
+  <srs>EPSG:4326</srs>
+  <nativeBoundingBox>
+    <minx>99.83062744140625</minx>
+    <maxx>100.33365631103516</maxx>
+    <miny>13.646749496459961</miny>
+    <maxy>14.208592414855957</maxy>
+    <crs>EPSG:4326</crs>
+  </nativeBoundingBox>
+  <latLonBoundingBox>
+    <minx>99.83062744140625</minx>
+    <maxx>100.33365631103516</maxx>
+    <miny>13.646749496459961</miny>
+    <maxy>14.208592414855957</maxy>
+    <crs>EPSG:4326</crs>
+  </latLonBoundingBox>
+  <projectionPolicy>FORCE_DECLARED</projectionPolicy>
+  <enabled>true</enabled>
+  <store class="dataStore">
+    <id>DataStoreInfoImpl-36837126:1a0cc11f503:-7968</id>
+  </store>
+  <serviceConfiguration>false</serviceConfiguration>
+  <maxFeatures>0</maxFeatures>
+  <numDecimals>0</numDecimals>
+  <padWithZeros>false</padWithZeros>
+  <forcedDecimal>false</forcedDecimal>
+  <overridingServiceSRS>false</overridingServiceSRS>
+  <skipNumberMatched>false</skipNumberMatched>
+  <circularArcPresent>false</circularArcPresent>
+</featureType>

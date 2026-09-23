@@ -23,7 +23,7 @@ from services.layer_group_service import (
 
 router = APIRouter(prefix="/layer-group", tags=["Layer Group"])
 
-wms_base = os.getenv("GEOSERVER_WMS_URL", "http://localhost:8080/geoserver")
+wms_base = (os.getenv("GEOSERVER_WMS_URL") or "").rstrip("/")
 
 # ── Pydantic Schemas ──────────────────────────────────────────────────────────
 

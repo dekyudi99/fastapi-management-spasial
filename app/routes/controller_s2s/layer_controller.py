@@ -46,7 +46,7 @@ def s2s_get_layers(
     user_agent = request.headers.get("user-agent") if request else None
 
     try:
-        wms_base = (os.getenv("GEOSERVER_WMS_URL") or "http://localhost:8080/geoserver").rstrip("/")
+        wms_base = (os.getenv("GEOSERVER_WMS_URL") or "").rstrip("/")
 
         base_query = (
             db.query(
@@ -279,7 +279,7 @@ async def s2s_download_layer(
         w = min(max(int(w), 128), 4096)
         h = min(max(int(h), 128), 4096)
 
-        geoserver_url = os.getenv("GEOSERVER_URL", "http://geoserver:8080/geoserver").rstrip("/")
+        geoserver_url = os.getenv("GEOSERVER_URL").rstrip("/")
         wms_endpoint = f"{geoserver_url}/{ws_name}/wms"
 
         style_param = "" if styled else "raster"

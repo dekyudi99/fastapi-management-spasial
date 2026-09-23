@@ -1,6 +1,6 @@
 from config.geoserver_auth import get_geoserver_connection
 from fastapi import APIRouter, HTTPException, Depends, Query, UploadFile, Form, File, status
-from typing import Optional
+from typing import Optional, List, Dict, Any
 from models.users import Users
 from models.layer import Layer
 from models.workspace import Workspace
@@ -8,41 +8,50 @@ from models.project import Project
 from models.api_key import ApiKey
 from services.auth_service import get_current_user
 from services.api_key_service import verify_api_key
-from config.database import get_db
+from config.database import get_db, engine
 from sqlalchemy.orm import Session
-from sqlalchemy import func
+from sqlalchemy import func, text
 from geoalchemy2.functions import ST_AsGeoJSON, ST_XMin, ST_YMin, ST_XMax, ST_YMax
 import os
+from datetime import datetime
+import re
 import shutil
 import uuid
 import zipfile
+import requests
+from requests.auth import HTTPBasicAuth
 from geoalchemy2.shape import from_shape
 from shapely.geometry import box
 from services.raster_service import get_tiff_metadata, sanitize_tiff_for_geoserver
-from services.vector_service import get_vector_metadata, prepare_csv_as_geopackage
+from services.vector_service import (
+    get_vector_metadata,
+    read_vector_file_to_gdf,
+    simplify_vector_gdf,
+    publish_vector_to_geoserver_postgis,
+)
 from services.hash_id import decode_id
 from pydantic import BaseModel
-from typing import List, Optional
-from services.sld_to_layer import apply_sld_to_layer, generate_raster_sld, assign_style_to_layer, style_exists_in_geoserver
+from services.sld_to_layer import apply_sld_to_layer, generate_raster_sld, generate_vector_sld, assign_style_to_layer, style_exists_in_geoserver
 
 router = APIRouter(prefix="/layer", tags=["Layer"])
 geo = get_geoserver_connection()
 
 
-# Path di dalam container (di-mount dari D:/proyek-gis/... via docker-compose volume)
-# GeoServer container juga mount path yang sama, sehingga bisa mengakses file ini.
+# Path di dalam container (di-mount via docker-compose volume)
 RASTER_PATH = "/data_raster"
 VECTOR_PATH = "/data_vector"
 
 os.makedirs(RASTER_PATH, exist_ok=True)
 os.makedirs(VECTOR_PATH, exist_ok=True)
 
-# SUPPORTED_FORMATS = ('.tif', '.tiff', '.geojson', '.zip', '.csv')
+RASTER_FORMATS = ('.tif', '.tiff')
+VECTOR_FORMATS = ('.geojson', '.json', '.zip', '.shp', '.gpkg', '.csv')
+SUPPORTED_FORMATS = RASTER_FORMATS + VECTOR_FORMATS
 
 
-# Untuk membuat layer sekaligus store baru di GeoServer
+# Endpoint utama: Otomatis mempublikasikan berkas Raster maupun Vector ke GeoServer
 @router.post("/publish-automated", status_code=status.HTTP_201_CREATED)
-async def publish_raster(
+async def publish_layer(
     workspace_id: str = Form(...),
     layer_name: str = Form(...),
     description: Optional[str] = Form(""),
@@ -64,38 +73,107 @@ async def publish_raster(
         )
 
         if workspace is None:
-            raise HTTPException(status_code=404, detail="Workspace tidak ditemukan!")
+            raise HTTPException(status_code=404, detail="Workspace tidak ditemukan atau tidak memiliki akses!")
 
         file_extension = os.path.splitext(file.filename)[1].lower()
-        if file_extension not in ('.tif', '.tiff'):
-            raise HTTPException(status_code=400, detail="Hanya file format GeoTIFF (.tif / .tiff) yang didukung!")
+        if file_extension not in SUPPORTED_FORMATS:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Format berkas '{file_extension}' tidak didukung! Format yang didukung: {', '.join(SUPPORTED_FORMATS)}"
+            )
 
-        store_name = f"{current_user.username}_{uuid.uuid4()}"
+        clean_user = re.sub(r'[^a-z0-9]', '', (current_user.username or "user").lower())[:8]
 
+        # ── KASUS 1: DATA VEKTOR (Shapefile, GeoJSON, GeoPackage, CSV) ────────
+        if file_extension in VECTOR_FORMATS:
+            table_name = f"vec_{clean_user}_{uuid.uuid4().hex[:10]}"
+            unique_filename = f"{table_name}{file_extension}"
+            file_path = os.path.normpath(os.path.join(VECTOR_PATH, unique_filename))
+
+            with open(file_path, "wb") as buffer:
+                shutil.copyfileobj(file.file, buffer)
+
+            # Baca file ke GeoPandas GeoDataFrame
+            gdf, format_name = read_vector_file_to_gdf(file_path)
+
+            # Lakukan Topology-Preserving Simplification secara otomatis berdasarkan nilai tetap environment
+            env_tol = os.getenv("SIMPLIFY_TOLERANCE")
+            if not env_tol:
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail="Variabel environment SIMPLIFY_TOLERANCE belum disetel."
+                )
+            fixed_tolerance = float(env_tol)
+            gdf, stats = simplify_vector_gdf(gdf, tolerance=fixed_tolerance, preserve_topology=True)
+
+            # Ambil Bounding Box dari data vektor
+            total_bounds = gdf.total_bounds
+            geom = box(
+                float(total_bounds[0]),
+                float(total_bounds[1]),
+                float(total_bounds[2]),
+                float(total_bounds[3])
+            )
+
+            # Publikasikan ke PostGIS dan GeoServer FeatureType
+            dominant_geom = stats.get("geometry_type", "Polygon")
+            publish_vector_to_geoserver_postgis(
+                gdf=gdf,
+                table_name=table_name,
+                workspace_name=workspace.ws_name,
+                title=layer_name,
+                geom_type=dominant_geom
+            )
+
+            # Simpan metadata Layer ke database
+            meta = Layer(
+                workspace_id=workspace.id,
+                name=layer_name,
+                description=description,
+                geoserver_name=table_name,
+                epsg=4326,
+                bbox=from_shape(geom, srid=4326),
+                width=None,
+                height=None,
+                layer_type="vector",
+                data_type=format_name,
+                file_path=file_path,
+                status="PUBLISHED",
+                metadata_json={"simplification": stats}
+            )
+
+            db.add(meta)
+            db.commit()
+
+            wms_base = (os.getenv("GEOSERVER_WMS_URL") or "").rstrip("/")
+            return {
+                "success": True,
+                "detail": f"Layer vektor '{layer_name}' berhasil disederhanakan dan dipublikasikan di workspace '{workspace.ws_name}'!",
+                "layer_id": meta.id,
+                "layer_type": "vector",
+                "data_type": format_name,
+                "geoserver_name": table_name,
+                "simplification": stats,
+                "wms_url": f"{wms_base}/{workspace.ws_name}/wms"
+            }
+
+        # ── KASUS 2: DATA RASTER (GeoTIFF .tif / .tiff) ──────────────────────
+        store_name = f"{clean_user}_{uuid.uuid4().hex[:10]}"
         unique_filename = f"{store_name}{file_extension}"
-
         file_path = os.path.normpath(os.path.join(RASTER_PATH, unique_filename))
-        
+
         with open(file_path, "wb") as buffer:
             shutil.copyfileobj(file.file, buffer)
 
-        # sanitize_tiff_for_geoserver(file_path)
-
         tiff_metadata = get_tiff_metadata(file_path)
-
         epsg = tiff_metadata["epsg"]
         bounds = tiff_metadata["bbox"]
-        width=tiff_metadata["dimensions"]["width"]
-        height=tiff_metadata["dimensions"]["height"]
+        width = tiff_metadata["dimensions"]["width"]
+        height = tiff_metadata["dimensions"]["height"]
 
-        geom = box(
-            bounds.left,
-            bounds.bottom,
-            bounds.right,
-            bounds.top
-        )
+        geom = box(bounds.left, bounds.bottom, bounds.right, bounds.top)
 
-        meta =Layer(
+        meta = Layer(
             workspace_id=workspace.id,
             name=layer_name,
             description=description,
@@ -118,15 +196,11 @@ async def publish_raster(
             path=file_path, 
             workspace=workspace.ws_name
         )
-        
+
         if success:
-            print(f"Berhasil! Layer '{layer_name}' siap diakses via WMS.")
-            # Cek apakah workspace memiliki default style, jika ada otomatis terapkan!
-            # Jika belum ada, buat style generic raster (grayscale) lalu assign
             default_style_name = f"default_{workspace.ws_name}"
             try:
                 if not style_exists_in_geoserver(default_style_name):
-                    # Buat style generic grayscale untuk raster
                     generic_sld = generate_raster_sld(
                         style_name=default_style_name,
                         color_entries=[
@@ -142,16 +216,24 @@ async def publish_raster(
                         style_name=default_style_name,
                         sld_xml=generic_sld
                     )
-                    print(f"Membuat dan menerapkan default style baru '{default_style_name}' ke layer '{layer_name}'")
                 else:
                     assign_style_to_layer(workspace.ws_name, store_name, default_style_name)
-                    print(f"Otomatis menerapkan default workspace style '{default_style_name}' ke layer '{layer_name}'")
             except Exception as se:
-                print(f"Info: Gagal menerapkan style, layer tetap menggunakan style default GeoServer: {se}")
+                print(f"Info: Style default diterapkan: {se}")
 
-            result = f"Layer '{layer_name}' berhasil dipublikasikan di workspace '{workspace.ws_name}'"
+            result = {
+                "success": True,
+                "detail": f"Layer raster '{layer_name}' berhasil dipublikasikan di workspace '{workspace.ws_name}'!",
+                "layer_id": meta.id,
+                "layer_type": "raster",
+                "data_type": "GeoTiff",
+                "geoserver_name": store_name
+            }
         else:
-            result = "Gagal mempublikasikan layer. Pastikan path file benar."
+            result = {
+                "success": False,
+                "detail": "Gagal mempublikasikan layer raster ke GeoServer."
+            }
         return result
     
     except HTTPException:
@@ -160,6 +242,157 @@ async def publish_raster(
         db.rollback()
         print(f"Gagal Menyimpan Data, Karena {e}")
         raise HTTPException(status_code=500, detail=f"Gagal Menyimpan Data, Karena {e}")
+
+
+# Endpoint S2S / Internal: Menerbitkan Layer Geosocial (Vektor / Raster) dari Laravel FlowGIS
+@router.post("/publish-geosocial", status_code=status.HTTP_201_CREATED)
+async def publish_geosocial_layer(
+    name: str = Form(...),
+    file: UploadFile = File(...),
+    workspace_name: Optional[str] = Form("geosocial"),
+    simplify_tolerance: Optional[float] = Form(0.00005),
+    simplify_enabled: Optional[bool] = Form(True),
+    db: Session = Depends(get_db),
+):
+    try:
+        # Pastikan workspace ada di GeoServer
+        try:
+            geo.create_workspace(workspace_name)
+        except Exception:
+            pass
+
+        file_ext = os.path.splitext(file.filename)[1].lower()
+        clean_name = re.sub(r'[^a-zA-Z0-9_]', '_', name.lower()).strip('_')
+        timestamp = int(datetime.now().timestamp())
+        store_name = f"geo_{clean_name}_{timestamp}"
+
+        wms_public_base = (os.getenv("GEOSERVER_WMS_URL") or "").rstrip("/")
+        wms_url = f"{wms_public_base}/{workspace_name}/wms"
+
+        # Simpan file sementara
+        temp_dir = os.path.join(VECTOR_PATH if file_ext in VECTOR_FORMATS else RASTER_PATH, "geosocial_uploads")
+        os.makedirs(temp_dir, exist_ok=True)
+        file_path = os.path.join(temp_dir, f"{store_name}{file_ext}")
+
+        with open(file_path, "wb") as f:
+            f.write(await file.read())
+
+        simplification_stats = None
+
+        if file_ext in VECTOR_FORMATS:
+            gdf, format_name = read_vector_file_to_gdf(file_path)
+
+            env_tol = os.getenv("SIMPLIFY_TOLERANCE")
+            if not env_tol:
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail="Variabel environment SIMPLIFY_TOLERANCE belum disetel."
+                )
+            fixed_tolerance = float(env_tol)
+
+            gdf, simplification_stats = simplify_vector_gdf(
+                gdf, 
+                tolerance=fixed_tolerance, 
+                preserve_topology=True
+            )
+
+            # Deteksi geometri type
+            geom_type = gdf.geometry.geom_type.iloc[0] if not gdf.empty else "Polygon"
+            table_name = f"vec_{store_name}"
+
+            publish_vector_to_geoserver_postgis(
+                gdf=gdf,
+                table_name=table_name,
+                workspace_name=workspace_name,
+                title=name,
+                geom_type=geom_type
+            )
+
+            layer_name = f"{workspace_name}:{table_name}"
+
+            return {
+                "success": True,
+                "layer_name": layer_name,
+                "workspace": workspace_name,
+                "wms_url": wms_url,
+                "type": "vector",
+                "geom_type": geom_type,
+                "table_name": table_name,
+                "simplification": simplification_stats,
+                "detail": f"Layer vektor '{name}' berhasil disederhanakan dan dipublikasikan ke GeoServer workspace '{workspace_name}'!"
+            }
+
+        elif file_ext in RASTER_FORMATS:
+            success = geo.create_coveragestore(
+                layer_name=store_name, 
+                path=file_path, 
+                workspace=workspace_name
+            )
+            if success:
+                default_style = f"default_{workspace_name}"
+                try:
+                    if not style_exists_in_geoserver(default_style):
+                        generic_sld = generate_raster_sld(
+                            style_name=default_style,
+                            color_entries=[
+                                {"quantity": 0, "color": "#000000", "opacity": 1.0, "label": "Low"},
+                                {"quantity": 128, "color": "#7f7f7f", "opacity": 1.0, "label": "Mid"},
+                                {"quantity": 255, "color": "#ffffff", "opacity": 1.0, "label": "High"},
+                            ],
+                            style_type="ramp"
+                        )
+                        apply_sld_to_layer(
+                            workspace=workspace_name,
+                            layer_name=store_name,
+                            style_name=default_style,
+                            sld_xml=generic_sld
+                        )
+                    else:
+                        assign_style_to_layer(workspace_name, store_name, default_style)
+                except Exception as se:
+                    print(f"Info Style: {se}")
+
+                layer_name = f"{workspace_name}:{store_name}"
+                return {
+                    "success": True,
+                    "layer_name": layer_name,
+                    "workspace": workspace_name,
+                    "wms_url": wms_url,
+                    "type": "raster",
+                    "detail": f"Layer raster '{name}' berhasil dipublikasikan ke GeoServer workspace '{workspace_name}'!"
+                }
+            else:
+                raise HTTPException(status_code=500, detail="Gagal membuat coveragestore di GeoServer.")
+        else:
+            raise HTTPException(status_code=400, detail=f"Format berkas '{file_ext}' tidak didukung.")
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Gagal publish geosocial layer: {e}")
+        raise HTTPException(status_code=500, detail=f"Gagal memproses layer: {str(e)}")
+
+
+# Endpoint Khusus: Menerbitkan Layer Vektor dengan Penyederhanaan Topologi
+@router.post("/publish-vector", status_code=status.HTTP_201_CREATED)
+async def publish_vector(
+    workspace_id: str = Form(...),
+    layer_name: str = Form(...),
+    description: Optional[str] = Form(""),
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    current_user: Users = Depends(get_current_user)
+):
+    return await publish_layer(
+        workspace_id=workspace_id,
+        layer_name=layer_name,
+        description=description,
+        file=file,
+        db=db,
+        current_user=current_user
+    )
+
+
 
 @router.get("/list")
 def list_layers(
@@ -173,7 +406,7 @@ def list_layers(
     try:
         # URL base WMS GeoServer untuk client browser — ambil dari .env (GEOSERVER_WMS_URL)
         # JANGAN gunakan GEOSERVER_URL karena itu hostname internal Docker (http://geoserver:8080)
-        wms_base = (os.getenv("GEOSERVER_WMS_URL") or "http://localhost:8080/geoserver").rstrip("/")
+        wms_base = (os.getenv("GEOSERVER_WMS_URL") or "").rstrip("/")
 
         # 1. Base Query Filter (Layer -> Workspace -> Project -> User)
         base_query = (
@@ -274,7 +507,7 @@ def get_layer_preview(
     # data = db.query(RasterMetadata).filter(id=id).first()
     
     # 2. Definisikan Base URL (diambil dari file .env)
-    base_url = (os.getenv("GEOSERVER_WMS_URL") or "http://localhost:8080/geoserver").rstrip("/")
+    base_url = (os.getenv("GEOSERVER_WMS_URL") or "").rstrip("/")
     
     workspace = "ikya_auto_test" # Sesuai folder di GeoServer Anda
     layer_name = "singaraja"      # Diambil dari kolom layer_name di DB
@@ -366,12 +599,29 @@ def delete_layer(
 
         workspace = db.query(Workspace).filter(Workspace.id == layer.workspace_id).first()
 
-        # 1. Hapus dari GeoServer jika ada
+        # 1. Hapus dari GeoServer & PostGIS jika ada
         if workspace and layer.geoserver_name:
-            try:
-                geo.delete_coveragestore(coveragestore_name=layer.geoserver_name, workspace=workspace.ws_name)
-            except Exception as ge:
-                print(f"Peringatan: Gagal menghapus coverage store di GeoServer: {ge}")
+            if layer.layer_type == "vector":
+                try:
+                    # Drop tabel PostGIS
+                    with engine.begin() as conn:
+                        conn.execute(text(f'DROP TABLE IF EXISTS public."{layer.geoserver_name}" CASCADE;'))
+                except Exception as de:
+                    print(f"Peringatan: Gagal menghapus tabel PostGIS: {de}")
+                try:
+                    actual_store = "postgis_geosocial" if workspace.ws_name == "geosocial" else "postgis_store"
+                    geoserver_url = os.getenv("GEOSERVER_URL").rstrip("/")
+                    requests.delete(
+                        f"{geoserver_url}/rest/workspaces/{workspace.ws_name}/datastores/{actual_store}/featuretypes/{layer.geoserver_name}?recurse=true",
+                        auth=HTTPBasicAuth(os.getenv("GEOSERVER_USER"), os.getenv("GEOSERVER_PASS"))
+                    )
+                except Exception:
+                    pass
+            else:
+                try:
+                    geo.delete_coveragestore(coveragestore_name=layer.geoserver_name, workspace=workspace.ws_name)
+                except Exception as ge:
+                    print(f"Peringatan: Gagal menghapus coverage store di GeoServer: {ge}")
 
             try:
                 geo.delete_style(style_name=f"style_{layer.geoserver_name}")

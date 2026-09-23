@@ -13,10 +13,12 @@ from fastapi import APIRouter
 
 from .controller_s2s.publish_controller import (
     router as publish_router,
+    s2s_publish_vector_layer,
     S2SPublishFromUrlRequest,
     _apply_layer_style,
     geo,
     RASTER_PATH,
+    VECTOR_PATH,
 )
 from .controller_s2s.layer_controller import (
     router as layer_router,
@@ -38,10 +40,12 @@ __all__ = [
     "publish_router",
     "layer_router",
     "layer_group_router",
+    "s2s_publish_vector_layer",
     "S2SPublishFromUrlRequest",
     "S2SCreateLayerGroupRequest",
     "S2SUpdateLayerGroupRequest",
     "_apply_layer_style",
     "geo",
     "RASTER_PATH",
+    "VECTOR_PATH",
 ]

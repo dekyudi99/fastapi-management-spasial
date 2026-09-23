@@ -42,9 +42,9 @@ def generate_raster_sld(style_name: str, color_entries: List[Dict], style_type: 
 
 
 def create_or_update_style(style_name: str, sld_xml: str) -> bool:
-    geoserver_url = os.getenv("GEOSERVER_URL", "http://geoserver:8080/geoserver")
-    user = os.getenv("GEOSERVER_USER", "admin")
-    pw = os.getenv("GEOSERVER_PASS", "rahasia")
+    geoserver_url = os.getenv("GEOSERVER_URL").rstrip("/")
+    user = os.getenv("GEOSERVER_USER")
+    pw = os.getenv("GEOSERVER_PASS")
     auth = HTTPBasicAuth(user, pw)
     
     # Bersihkan nama style dari ekstensi agar GeoServer tidak keliru membaca format URL
@@ -77,18 +77,18 @@ def create_or_update_style(style_name: str, sld_xml: str) -> bool:
 def style_exists_in_geoserver(style_name: str) -> bool:
     """Cek apakah style tertentu sudah ada di GeoServer."""
     clean_name = os.path.splitext(style_name)[0].replace('.', '_')
-    geoserver_url = os.getenv("GEOSERVER_URL", "http://geoserver:8080/geoserver")
-    user = os.getenv("GEOSERVER_USER", "admin")
-    pw = os.getenv("GEOSERVER_PASS", "rahasia")
+    geoserver_url = os.getenv("GEOSERVER_URL").rstrip("/")
+    user = os.getenv("GEOSERVER_USER")
+    pw = os.getenv("GEOSERVER_PASS")
     auth = HTTPBasicAuth(user, pw)
     res = requests.get(f"{geoserver_url}/rest/styles/{clean_name}.json", auth=auth)
     return res.status_code == 200
 
 
 def assign_style_to_layer(workspace: str, layer_name: str, style_name: str) -> bool:
-    geoserver_url = os.getenv("GEOSERVER_URL", "http://geoserver:8080/geoserver")
-    user = os.getenv("GEOSERVER_USER", "admin")
-    pw = os.getenv("GEOSERVER_PASS", "rahasia")
+    geoserver_url = os.getenv("GEOSERVER_URL").rstrip("/")
+    user = os.getenv("GEOSERVER_USER")
+    pw = os.getenv("GEOSERVER_PASS")
     auth = HTTPBasicAuth(user, pw)
 
     clean_style = os.path.splitext(style_name)[0].replace('.', '_')
@@ -140,3 +140,74 @@ def apply_sld_to_layer(workspace: str, layer_name: str, style_name: str, sld_xml
     if sld_xml:
         create_or_update_style(style_name, sld_xml)
     return assign_style_to_layer(workspace, layer_name, style_name)
+
+
+def generate_vector_sld(
+    style_name: str,
+    geom_type: str = "polygon",
+    fill_color: str = "#0d9488",
+    stroke_color: str = "#0f766e",
+    stroke_width: float = 1.5,
+    fill_opacity: float = 0.45
+) -> str:
+    """
+    Generate SLD 1.0.0 XML untuk Vector Layer (Polygon, Line, Point).
+    """
+    geom_type_lower = (geom_type or "polygon").lower()
+    if "polygon" in geom_type_lower:
+        symbolizer_xml = f"""            <PolygonSymbolizer>
+              <Fill>
+                <CssParameter name="fill">{fill_color}</CssParameter>
+                <CssParameter name="fill-opacity">{fill_opacity}</CssParameter>
+              </Fill>
+              <Stroke>
+                <CssParameter name="stroke">{stroke_color}</CssParameter>
+                <CssParameter name="stroke-width">{stroke_width}</CssParameter>
+              </Stroke>
+            </PolygonSymbolizer>"""
+    elif "line" in geom_type_lower or "string" in geom_type_lower:
+        symbolizer_xml = f"""            <LineSymbolizer>
+              <Stroke>
+                <CssParameter name="stroke">{stroke_color}</CssParameter>
+                <CssParameter name="stroke-width">{stroke_width}</CssParameter>
+              </Stroke>
+            </LineSymbolizer>"""
+    else:
+        # Point
+        symbolizer_xml = f"""            <PointSymbolizer>
+              <Graphic>
+                <Mark>
+                  <WellKnownName>circle</WellKnownName>
+                  <Fill>
+                    <CssParameter name="fill">{fill_color}</CssParameter>
+                  </Fill>
+                  <Stroke>
+                    <CssParameter name="stroke">{stroke_color}</CssParameter>
+                    <CssParameter name="stroke-width">{stroke_width}</CssParameter>
+                  </Stroke>
+                </Mark>
+                <Size>8</Size>
+              </Graphic>
+            </PointSymbolizer>"""
+
+    sld_xml = f"""<?xml version="1.0" encoding="UTF-8"?>
+<StyledLayerDescriptor version="1.0.0" 
+    xmlns="http://www.opengis.net/sld"
+    xmlns:ogc="http://www.opengis.net/ogc" 
+    xmlns:xlink="http://www.w3.org/1999/xlink" 
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <NamedLayer>
+    <Name>{style_name}</Name>
+    <UserStyle>
+      <Title>{style_name}</Title>
+      <FeatureTypeStyle>
+        <Rule>
+{symbolizer_xml}
+        </Rule>
+      </FeatureTypeStyle>
+    </UserStyle>
+  </NamedLayer>
+</StyledLayerDescriptor>
+"""
+    return sld_xml
+
