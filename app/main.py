@@ -44,8 +44,7 @@ default_origins = [
     "https://flowgis.ikya.my.id",
 ]
 
-env_cors = os.getenv("CORS_ORIGINS")
-origins = [orig.strip() for orig in env_cors.split(",") if orig.strip()] if env_cors else default_origins
+origins = default_origins
 
 app.add_middleware(
     CORSMiddleware,
