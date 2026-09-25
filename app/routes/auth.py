@@ -25,13 +25,16 @@ def register(
     if len(password) < 8:
         raise HTTPException(status_code=400, detail="Password must be at least 8 characters long.")
 
-    if db.query(Users).filter(Users.username == username).first():
-        raise HTTPException(status_code=400, detail="Username is already taken.")
-
     existing_user = db.query(Users).filter(Users.email == email).first()
+    if existing_user and existing_user.is_verified:
+        raise HTTPException(status_code=400, detail="Email is already registered. Please log in.")
+
+    existing_username = db.query(Users).filter(Users.username == username).first()
+    if existing_username:
+        if not existing_user or existing_username.id != existing_user.id:
+            raise HTTPException(status_code=400, detail="Username is already taken.")
+
     if existing_user:
-        if existing_user.is_verified:
-            raise HTTPException(status_code=400, detail="Email is already registered. Please log in.")
         existing_user.username = username
         existing_user.password = hash_password(password)
         db.commit()
@@ -139,8 +142,9 @@ def send_register_otp(
     background_tasks: BackgroundTasks = None,
     db: Session = Depends(get_db)
 ):
-    # Cek apakah email sudah terdaftar
-    if db.query(Users).filter(Users.email == email).first():
+    # Cek apakah email sudah terdaftar dan sudah diverifikasi
+    existing_user = db.query(Users).filter(Users.email == email).first()
+    if existing_user and existing_user.is_verified:
         raise HTTPException(status_code=400, detail="Email is already registered. Please use another email or log in.")
     # Generate 6 Digit OTP
     otp = str(random.randint(100000, 999999))

@@ -100,27 +100,41 @@ Tim AstraGIS Platform
 </body>
 </html>"""
 
-    # Buat email multipart/alternative dengan header anti-spam RFC 5322
+    if not smtp_user or not smtp_pass:
+        print(f"[SMTP Error] Gagal mengirim email ke {to_email}: SMTP_USER atau SMTP_PASSWORD belum diatur di file .env!")
+        return False
+
+    # Buat email multipart/alternative standar RFC 5322 untuk deliverability maksimal
     msg = MIMEMultipart("alternative")
     msg["Subject"] = subject
     msg["From"] = f"{from_name} <{from_email}>"
     msg["To"] = to_email
     msg["Date"] = email.utils.formatdate(localtime=True)
-    msg["Message-ID"] = email.utils.make_msgid(domain="astragis.com")
+    msg["Reply-To"] = from_email
     msg["MIME-Version"] = "1.0"
-    msg["X-Priority"] = "3"
-    msg["Precedence"] = "bulk"
-    msg["Auto-Submitted"] = "auto-generated"
+    msg["X-Priority"] = "1"  # Prioritas tinggi untuk email transaksional / OTP
 
     # CRITICAL: Plain text WAJIB di-attach pertama, lalu HTML kedua
     msg.attach(MIMEText(plain_text, "plain", "utf-8"))
     msg.attach(MIMEText(html_content, "html", "utf-8"))
 
     try:
-        with smtplib.SMTP(smtp_host, smtp_port, timeout=15) as server:
-            server.starttls()
-            server.login(smtp_user, smtp_pass)
-            server.sendmail(from_email, to_email, msg.as_string())
-            print(f"[SMTP Success] Email OTP berhasil terkirim ke {to_email}")
+        # Otomatis gunakan SSL langsung jika port 465, atau STARTTLS jika port 587/lainnya
+        if smtp_port == 465:
+            with smtplib.SMTP_SSL(smtp_host, smtp_port, timeout=15) as server:
+                server.login(smtp_user, smtp_pass)
+                server.sendmail(from_email, to_email, msg.as_string())
+        else:
+            with smtplib.SMTP(smtp_host, smtp_port, timeout=15) as server:
+                server.starttls()
+                server.login(smtp_user, smtp_pass)
+                server.sendmail(from_email, to_email, msg.as_string())
+                
+        print(f"[SMTP Success] Email OTP berhasil terkirim ke {to_email}")
+        return True
+    except smtplib.SMTPAuthenticationError as auth_err:
+        print(f"[SMTP Error] Gagal otentikasi Gmail (Cek App Password atau IP Proxmox): {auth_err}")
+        return False
     except Exception as e:
         print(f"[SMTP Error] Gagal mengirim email ke {to_email}: {e}")
+        return False
