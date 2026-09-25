@@ -9,6 +9,7 @@ from services.password_service import hash_password
 import secrets
 from sqlalchemy import func
 from services.hash_id import encode_id, decode_id
+from services.log_service import create_log
 
 router = APIRouter(prefix="/api-key", tags=["Api Key"])
 
@@ -37,6 +38,22 @@ def create_api_key(
         
         db.add(api_key)
         db.commit()
+        db.refresh(api_key)
+
+        create_log(
+            db=db,
+            auth_type="JWT",
+            user_id=current_user.id,
+            project_id=id,
+            action="API_KEY_CREATE",
+            resource_type="API_KEY",
+            resource_id=str(api_key.id),
+            resource_name=name,
+            status="SUCCESS",
+            client_user_name=current_user.username,
+            client_user_email=current_user.email,
+        )
+
         return {
             "success": True,
             "detail": "Api Key berhasil dibuat!",

@@ -14,6 +14,7 @@ from services.hash_id import encode_id, decode_id
 from pydantic import BaseModel
 from typing import List, Optional
 from services.sld_to_layer import generate_raster_sld, create_or_update_style, assign_style_to_layer
+from services.log_service import create_log
 
 router = APIRouter(prefix="/workspace", tags=["Workspace"])
 geo = get_geoserver_connection()
@@ -46,6 +47,21 @@ def create_workspace(
 
             db.add(workspace)
             db.commit()
+            db.refresh(workspace)
+
+            create_log(
+                db=db,
+                auth_type="JWT",
+                user_id=current_user.id,
+                project_id=id,
+                action="WORKSPACE_CREATE",
+                resource_type="WORKSPACE",
+                resource_id=str(workspace.id),
+                resource_name=name_workspace,
+                status="SUCCESS",
+                client_user_name=current_user.username,
+                client_user_email=current_user.email,
+            )
 
             return {
                 "success": True,

@@ -48,18 +48,24 @@ def read_vector_file_to_gdf(file_path: str) -> Tuple[gpd.GeoDataFrame, str]:
     """
     ext = os.path.splitext(file_path)[1].lower()
 
+    def _read_fast(path):
+        try:
+            return gpd.read_file(path, engine="pyogrio")
+        except Exception:
+            return gpd.read_file(path)
+
     if ext in ('.geojson', '.json'):
-        gdf = gpd.read_file(file_path)
+        gdf = _read_fast(file_path)
         format_name = "GeoJSON"
     elif ext == '.zip':
         # Dukung ESRI Shapefile yang dikompresi dalam berkas .zip
-        gdf = gpd.read_file(f"zip://{file_path}")
+        gdf = _read_fast(f"zip://{file_path}")
         format_name = "Shapefile"
     elif ext == '.shp':
-        gdf = gpd.read_file(file_path)
+        gdf = _read_fast(file_path)
         format_name = "Shapefile"
     elif ext == '.gpkg':
-        gdf = gpd.read_file(file_path)
+        gdf = _read_fast(file_path)
         format_name = "GeoPackage"
     elif ext == '.csv':
         df = pd.read_csv(file_path)
@@ -118,7 +124,12 @@ def simplify_vector_gdf(
             return sum(count_vertices(part) for part in geom.geoms)
         return 0
 
-    total_vertices_before = sum(count_vertices(g) for g in gdf.geometry)
+    # Hitung jumlah koordinat secara instan (C-vectorized via Shapely)
+    try:
+        import shapely
+        total_vertices_before = int(shapely.get_num_coordinates(gdf.geometry.values).sum())
+    except Exception:
+        total_vertices_before = sum(count_vertices(g) for g in gdf.geometry)
 
     # Deteksi tipe geometri dominan
     geom_types = set(gdf.geom_type.dropna().unique())
@@ -129,19 +140,27 @@ def simplify_vector_gdf(
         # Douglas-Peucker dengan jaminan topologi
         simplified_geoms = gdf.geometry.simplify(tolerance=tolerance, preserve_topology=preserve_topology)
 
-        # Perbaiki setiap poligon yang mungkin anomali pasca-simplifikasi
-        def safe_valid(g):
-            if g is None or g.is_empty or g.is_valid:
-                return g
-            try:
-                return make_valid(g)
-            except Exception:
-                return g.buffer(0)
+        # Perbaiki poligon yang anomali secara selektif (hanya yang tidak valid)
+        invalid_mask = ~simplified_geoms.is_valid & ~simplified_geoms.is_empty & simplified_geoms.notna()
+        if invalid_mask.any():
+            def safe_valid(g):
+                if g is None or g.is_empty or g.is_valid:
+                    return g
+                try:
+                    return make_valid(g)
+                except Exception:
+                    return g.buffer(0)
+            simplified_geoms.loc[invalid_mask] = simplified_geoms.loc[invalid_mask].apply(safe_valid)
 
         gdf = gdf.copy()
-        gdf['geometry'] = simplified_geoms.apply(safe_valid)
+        gdf['geometry'] = simplified_geoms
 
-    total_vertices_after = sum(count_vertices(g) for g in gdf.geometry)
+    try:
+        import shapely
+        total_vertices_after = int(shapely.get_num_coordinates(gdf.geometry.values).sum())
+    except Exception:
+        total_vertices_after = sum(count_vertices(g) for g in gdf.geometry)
+
     reduction_pct = 0.0
     if total_vertices_before > 0:
         reduction_pct = round((1.0 - (total_vertices_after / total_vertices_before)) * 100.0, 1)
@@ -232,8 +251,8 @@ def publish_vector_to_geoserver_postgis(
     pw = os.getenv("GEOSERVER_PASS")
     auth = HTTPBasicAuth(user, pw)
 
-    # 1. Simpan tabel ke PostGIS via SQLAlchemy engine
-    gdf.to_postgis(table_name, engine, schema="public", if_exists="replace", index=False)
+    # 1. Simpan tabel ke PostGIS via SQLAlchemy engine (dengan streaming chunk agar stabil)
+    gdf.to_postgis(table_name, engine, schema="public", if_exists="replace", index=False, chunksize=1000)
 
     # 2. Pastikan datastore siap
     # Jika workspace adalah geosocial, prioritaskan nama datastore 'postgis_geosocial'
@@ -245,7 +264,7 @@ def publish_vector_to_geoserver_postgis(
         "featureType": {
             "name": table_name,
             "nativeName": table_name,
-            "title": title,
+            "title": table_name,
             "srs": "EPSG:4326",
             "enabled": True
         }

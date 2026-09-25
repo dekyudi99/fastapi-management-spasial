@@ -149,17 +149,20 @@ async def s2s_delete_layer(
     """
     client_ip = request.client.host if request and request.client else None
     user_agent = request.headers.get("user-agent") if request else None
-
     try:
         actual_id = int(layer_id) if str(layer_id).isdigit() else decode_id(layer_id)
-        if actual_id is None:
-            raise HTTPException(status_code=400, detail="ID Layer tidak valid.")
 
         query = (
             db.query(Layer)
             .join(Workspace, Workspace.id == Layer.workspace_id)
-            .filter(Layer.id == actual_id, Workspace.project_id == api_key.project_id)
+            .filter(Workspace.project_id == api_key.project_id)
         )
+
+        if actual_id is not None:
+            query = query.filter(Layer.id == actual_id)
+        else:
+            clean_search = str(layer_id).split(':')[-1]
+            query = query.filter((Layer.geoserver_name == clean_search) | (Layer.name == layer_id) | (Layer.geoserver_name == layer_id))
         if client_user_id:
             query = query.filter(Layer.client_user_id == str(client_user_id))
 

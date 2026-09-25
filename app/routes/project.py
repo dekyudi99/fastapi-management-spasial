@@ -10,6 +10,9 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func
 from services.hash_id import decode_id, encode_id
 
+from models.logs import Logs
+from services.log_service import create_log
+
 router = APIRouter(prefix="/project", tags=["Project"])
 
 @router.post("", status_code=status.HTTP_201_CREATED)
@@ -28,6 +31,20 @@ def create_project(
     try:
         db.add(project)
         db.commit()
+        db.refresh(project)
+        create_log(
+            db=db,
+            auth_type="JWT",
+            user_id=current_user.id,
+            project_id=project.id,
+            action="PROJECT_CREATE",
+            resource_type="PROJECT",
+            resource_id=str(project.id),
+            resource_name=project.project_name,
+            status="SUCCESS",
+            client_user_name=current_user.username,
+            client_user_email=current_user.email,
+        )
         return {
             "success": True,
             "detail": "Project berhasil dibuat"
@@ -116,6 +133,19 @@ def update_project(
         project.description = description
 
         db.commit()
+        create_log(
+            db=db,
+            auth_type="JWT",
+            user_id=current_user.id,
+            project_id=project.id,
+            action="PROJECT_UPDATE",
+            resource_type="PROJECT",
+            resource_id=str(project.id),
+            resource_name=project.project_name,
+            status="SUCCESS",
+            client_user_name=current_user.username,
+            client_user_email=current_user.email,
+        )
 
         return {
             "success": True,
@@ -196,3 +226,118 @@ def delete_user(
         }
     except HTTPException:
         raise
+
+
+@router.get("/{hashed_id}/logs")
+def get_project_logs(
+    hashed_id: str,
+    page: int = Query(1, ge=1),
+    size: int = Query(20, ge=1, le=100),
+    current_user: Users = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Mengambil riwayat log aktivitas spesifik untuk project ini"""
+    try:
+        project_id = decode_id(hashed_id)
+        project = db.query(Project).filter(Project.id == project_id, Project.user_id == current_user.id).first()
+        if not project:
+            raise HTTPException(status_code=404, detail="Project tidak ditemukan!")
+
+        # Jika log masih kosong pada project lama, generate histori awal otomatis
+        existing_log_count = db.query(Logs).filter(Logs.project_id == project_id).count()
+        if existing_log_count == 0:
+            create_log(
+                db=db,
+                auth_type="JWT",
+                user_id=current_user.id,
+                project_id=project_id,
+                action="PROJECT_CREATE",
+                resource_type="PROJECT",
+                resource_id=str(project_id),
+                resource_name=project.project_name,
+                status="SUCCESS",
+                client_user_name=current_user.username,
+                client_user_email=current_user.email,
+            )
+            workspaces = db.query(Workspace).filter(Workspace.project_id == project_id).all()
+            for ws in workspaces:
+                create_log(
+                    db=db,
+                    auth_type="JWT",
+                    user_id=current_user.id,
+                    project_id=project_id,
+                    action="WORKSPACE_CREATE",
+                    resource_type="WORKSPACE",
+                    resource_id=str(ws.id),
+                    resource_name=ws.name,
+                    status="SUCCESS",
+                    client_user_name=current_user.username,
+                    client_user_email=current_user.email,
+                )
+                layers = db.query(Layer).filter(Layer.workspace_id == ws.id).all()
+                for lyr in layers:
+                    create_log(
+                        db=db,
+                        auth_type="JWT",
+                        user_id=current_user.id,
+                        project_id=project_id,
+                        action="LAYER_PUBLISH",
+                        resource_type="LAYER",
+                        resource_id=str(lyr.id),
+                        resource_name=lyr.layer_name,
+                        status="SUCCESS",
+                        client_user_name=current_user.username,
+                        client_user_email=current_user.email,
+                    )
+            api_keys = db.query(ApiKey).filter(ApiKey.project_id == project_id).all()
+            for ak in api_keys:
+                create_log(
+                    db=db,
+                    auth_type="JWT",
+                    user_id=current_user.id,
+                    project_id=project_id,
+                    action="API_KEY_CREATE",
+                    resource_type="API_KEY",
+                    resource_id=str(ak.id),
+                    resource_name=ak.name,
+                    status="SUCCESS",
+                    client_user_name=current_user.username,
+                    client_user_email=current_user.email,
+                )
+
+        query = db.query(Logs).filter(Logs.project_id == project_id).order_by(Logs.created_at.desc())
+        total = query.count()
+        logs = query.offset((page - 1) * size).limit(size).all()
+
+        data = []
+        for log in logs:
+            data.append({
+                "id": log.id,
+                "action": log.action,
+                "resource_type": log.resource_type,
+                "resource_id": log.resource_id,
+                "resource_name": log.resource_name,
+                "status": log.status,
+                "auth_type": log.auth_type,
+                "client_user_name": log.client_user_name or current_user.username,
+                "client_user_email": log.client_user_email,
+                "ip_address": log.ip_address,
+                "meta_data": log.meta_data,
+                "created_at": log.created_at.isoformat() if log.created_at else None,
+            })
+
+        return {
+            "success": True,
+            "detail": "Project logs retrieved successfully.",
+            "data": data,
+            "pagination": {
+                "total": total,
+                "page": page,
+                "size": size,
+                "total_pages": (total + size - 1) // size
+            }
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))

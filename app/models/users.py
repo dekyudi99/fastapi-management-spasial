@@ -1,4 +1,4 @@
-from sqlalchemy import Column, BigInteger, VARCHAR
+from sqlalchemy import Column, BigInteger, VARCHAR, Boolean, TIMESTAMP, func
 from config.database import Base
 
 class Users(Base):
@@ -9,3 +9,5 @@ class Users(Base):
     email = Column(VARCHAR(255), unique=True, nullable=False)
     password = Column(VARCHAR(255), nullable=False)
     role = Column(VARCHAR(20), default="user")
+    is_verified = Column(Boolean, default=False)
+    created_at = Column(TIMESTAMP, server_default=func.now())

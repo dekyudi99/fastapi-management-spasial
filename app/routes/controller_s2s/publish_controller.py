@@ -690,9 +690,24 @@ async def s2s_publish_vector_layer(
                 detail=f"Format berkas '{file_extension}' tidak didukung! Format yang didukung: {', '.join(VECTOR_FORMATS)}"
             )
 
+        # Cek apakah layer dengan nama yang sama sudah ada di workspace ini
+        existing_layer = (
+            db.query(Layer)
+            .filter(Layer.workspace_id == workspace.id, Layer.name == layer_name)
+            .first()
+        )
+
         clean_slug = re.sub(r'[^a-zA-Z0-9_]', '_', layer_name.lower()).strip('_')[:20]
-        store_name = f"s2s_vec_{clean_slug}_{uuid.uuid4().hex[:8]}"
-        unique_filename = f"{store_name}{file_extension}"
+        ws_prefix = re.sub(r'[^a-zA-Z0-9_]', '_', workspace.ws_name.lower()).strip('_')[:15]
+
+        if existing_layer and existing_layer.geoserver_name:
+            table_name = existing_layer.geoserver_name
+        else:
+            unique_suffix = uuid.uuid4().hex[:10]
+            table_name = f"vec_{clean_slug}_{unique_suffix}" if clean_slug else f"vec_s2s_{unique_suffix}"
+
+        store_name = table_name
+        unique_filename = f"{table_name}{file_extension}"
         file_path = os.path.normpath(os.path.join(VECTOR_PATH, unique_filename))
 
         with open(file_path, "wb") as buffer:
@@ -723,7 +738,6 @@ async def s2s_publish_vector_layer(
 
         # Publikasikan ke PostGIS dan GeoServer FeatureType
         dominant_geom = stats.get("geometry_type", "Polygon")
-        table_name = f"vec_{store_name}"
         publish_vector_to_geoserver_postgis(
             gdf=gdf,
             table_name=table_name,
@@ -745,27 +759,37 @@ async def s2s_publish_vector_layer(
             "extra": parsed_meta
         }
 
-        layer_meta = Layer(
-            workspace_id=workspace.id,
-            name=layer_name,
-            description=description,
-            geoserver_name=table_name,
-            epsg=4326,
-            bbox=from_shape(geom, srid=4326),
-            width=None,
-            height=None,
-            layer_type="vector",
-            data_type=format_name,
-            file_path=file_path,
-            status="PUBLISHED",
-            metadata_json=full_metadata
-        )
+        if existing_layer:
+            layer_meta = existing_layer
+            layer_meta.description = description
+            layer_meta.geoserver_name = table_name
+            layer_meta.bbox = from_shape(geom, srid=4326)
+            layer_meta.data_type = format_name
+            layer_meta.file_path = file_path
+            layer_meta.status = "PUBLISHED"
+            layer_meta.metadata_json = full_metadata
+        else:
+            layer_meta = Layer(
+                workspace_id=workspace.id,
+                name=layer_name,
+                description=description,
+                geoserver_name=table_name,
+                epsg=4326,
+                bbox=from_shape(geom, srid=4326),
+                width=None,
+                height=None,
+                layer_type="vector",
+                data_type=format_name,
+                file_path=file_path,
+                status="PUBLISHED",
+                metadata_json=full_metadata
+            )
+            db.add(layer_meta)
 
-        db.add(layer_meta)
         db.commit()
         db.refresh(layer_meta)
 
-        wms_base = (os.getenv("GEOSERVER_WMS_URL")).rstrip("/")
+        wms_base = (os.getenv("GEOSERVER_WMS_URL") or "http://localhost:8080/geoserver").rstrip("/")
         wms_url = f"{wms_base}/{workspace.ws_name}/wms"
         full_layer_name = f"{workspace.ws_name}:{table_name}"
 

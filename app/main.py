@@ -7,6 +7,33 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+from config.database import Base, engine
+from sqlalchemy import text
+from models import email_otp, users
+
+# Pastikan tabel baru dibuat dan kolom is_verified tersedia di PostgreSQL
+try:
+    Base.metadata.create_all(bind=engine)
+    with engine.begin() as conn:
+        conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS is_verified BOOLEAN DEFAULT FALSE;"))
+        try:
+            srid_check = conn.execute(text("SELECT COUNT(*) FROM spatial_ref_sys WHERE srid = 4326;")).scalar()
+            if not srid_check:
+                conn.execute(text("""
+                    INSERT INTO spatial_ref_sys (srid, auth_name, auth_srid, srtext, proj4text)
+                    VALUES (
+                        4326,
+                        'EPSG',
+                        4326,
+                        'GEOGCS["WGS 84",DATUM["WGS_1984",SPHEROID["WGS 84",6378137,298.257223563,AUTHORITY["EPSG","7030"]],AUTHORITY["EPSG","6326"]],PRIMEM["Greenwich",0,AUTHORITY["EPSG","8901"]],UNIT["degree",0.0174532925199433,AUTHORITY["EPSG","9122"]],AUTHORITY["EPSG","4326"]]',
+                        '+proj=longlat +datum=WGS84 +no_defs'
+                    ) ON CONFLICT (srid) DO NOTHING;
+                """))
+        except Exception as e_srid:
+            print(f"[PostGIS SRID Check] {e_srid}")
+except Exception as e:
+    print(f"[DB Auto-Migration] {e}")
+
 app = FastAPI()
 
 default_origins = [
