@@ -1,20 +1,33 @@
+# Web Framework & Core
 fastapi
-uvicorn
-geoserver-rest
-dotenv
+uvicorn[standard]
+pydantic
 python-multipart
+python-dotenv
+
+# Database & ORM
+SQLAlchemy
+GeoAlchemy2
 psycopg2-binary
+psycopg[binary]
 asyncpg
-sqlalchemy
-geoalchemy2
+
+# Geospatial & Data Processing
+geopandas
 rasterio
 shapely
+fiona
+pyproj
+numpy
+pandas
+
+# GeoServer Integration & Network
+geoserver-rest
 httpx
-uuid
+requests
 xmltodict
+
+# Security & Utilities
 bcrypt
-pyjwt
-datetime
+PyJWT
 sqids
-geopandas
-psycopg[binary]
