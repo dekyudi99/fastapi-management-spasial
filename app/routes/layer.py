@@ -48,7 +48,7 @@ os.makedirs(RASTER_PATH, exist_ok=True)
 os.makedirs(VECTOR_PATH, exist_ok=True)
 
 RASTER_FORMATS = ('.tif', '.tiff')
-VECTOR_FORMATS = ('.geojson', '.json', '.zip', '.shp', '.gpkg', '.csv')
+VECTOR_FORMATS = ('.geojson', '.json', '.zip', '.shp', '.gpkg', '.csv', '.kml', '.kmz')
 SUPPORTED_FORMATS = RASTER_FORMATS + VECTOR_FORMATS
 
 

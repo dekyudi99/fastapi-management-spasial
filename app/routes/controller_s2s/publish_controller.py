@@ -44,7 +44,7 @@ RASTER_PATH = "/data_raster"
 VECTOR_PATH = "/data_vector"
 os.makedirs(RASTER_PATH, exist_ok=True)
 os.makedirs(VECTOR_PATH, exist_ok=True)
-VECTOR_FORMATS = ('.shp', '.zip', '.geojson', '.json', '.gpkg', '.csv')
+VECTOR_FORMATS = ('.shp', '.zip', '.geojson', '.json', '.gpkg', '.csv', '.kml', '.kmz')
 
 
 # ── Pydantic Request Models ───────────────────────────────────────────────────
