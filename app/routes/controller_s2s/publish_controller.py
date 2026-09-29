@@ -15,7 +15,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 from config.database import get_db
-from config.geoserver_auth import get_geoserver_connection
+from services.geoserver_service_client import geoserver_service_client
 from models.layer import Layer
 from models.workspace import Workspace
 from models.project import Project
@@ -38,7 +38,7 @@ from services.vector_service import (
 )
 
 router = APIRouter()
-geo = get_geoserver_connection()
+geo = geoserver_service_client
 
 RASTER_PATH = "/data_raster"
 VECTOR_PATH = "/data_vector"
@@ -345,10 +345,10 @@ async def s2s_publish_from_url(
 
 
         # 7. Publish ke GeoServer
-        publish_ok = geo.create_coveragestore(
-            layer_name=store_name,
-            path=file_path,
-            workspace=workspace.ws_name,
+        publish_ok = geoserver_service_client.create_coveragestore(
+            store_name=store_name,
+            raster_path=file_path,
+            workspace_name=workspace.ws_name,
         )
         if not publish_ok:
             db.delete(layer_meta)
@@ -548,10 +548,10 @@ async def s2s_publish_layer(
         db.add(layer_meta)
         db.commit()
 
-        publish_ok = geo.create_coveragestore(
-            layer_name=store_name,
-            path=file_path,
-            workspace=workspace.ws_name,
+        publish_ok = geoserver_service_client.create_coveragestore(
+            store_name=store_name,
+            raster_path=file_path,
+            workspace_name=workspace.ws_name,
         )
         if not publish_ok:
             db.delete(layer_meta)

@@ -1,4 +1,4 @@
-from config.geoserver_auth import get_geoserver_connection
+from services.geoserver_service_client import geoserver_service_client
 from fastapi import APIRouter, HTTPException, Depends, Query, UploadFile, Form, File, status
 from typing import Optional, List, Dict, Any
 from models.users import Users
@@ -25,7 +25,14 @@ import requests
 from requests.auth import HTTPBasicAuth
 from geoalchemy2.shape import from_shape
 from shapely.geometry import box
-from services.raster_service import get_tiff_metadata, sanitize_tiff_for_geoserver
+from services.raster_service import (
+    get_tiff_metadata,
+    sanitize_tiff_for_geoserver,
+    get_raster_statistics,
+    classify_raster_data,
+    COLOR_RAMPS,
+)
+from sqlalchemy.orm.attributes import flag_modified
 from services.vector_service import (
     get_vector_metadata,
     read_vector_file_to_gdf,
@@ -37,7 +44,6 @@ from pydantic import BaseModel
 from services.sld_to_layer import apply_sld_to_layer, generate_raster_sld, generate_vector_sld, assign_style_to_layer, style_exists_in_geoserver
 
 router = APIRouter(prefix="/layer", tags=["Layer"])
-geo = get_geoserver_connection()
 
 
 # Path di dalam container (di-mount via docker-compose volume)
@@ -194,35 +200,49 @@ async def publish_layer(
         db.add(meta)
         db.commit()
 
-        success = geo.create_coveragestore(
-            layer_name=store_name, 
-            path=file_path, 
-            workspace=workspace.ws_name
+        success = geoserver_service_client.create_coveragestore(
+            store_name=store_name, 
+            workspace_name=workspace.ws_name,
+            raster_path=file_path
         )
 
         if success:
-            default_style_name = f"default_{workspace.ws_name}"
-            try:
-                if not style_exists_in_geoserver(default_style_name):
-                    generic_sld = generate_raster_sld(
-                        style_name=default_style_name,
-                        color_entries=[
-                            {"quantity": 0,   "color": "#000000", "opacity": 1.0, "label": "Low"},
-                            {"quantity": 128, "color": "#7f7f7f", "opacity": 1.0, "label": "Mid"},
-                            {"quantity": 255, "color": "#ffffff", "opacity": 1.0, "label": "High"},
-                        ],
-                        style_type="ramp"
+            ws_meta = workspace.metadata_json if isinstance(workspace.metadata_json, dict) else {}
+            default_style_config = ws_meta.get("default_style")
+
+            # Jika workspace memiliki default style yang diatur secara eksplisit oleh pengguna:
+            if default_style_config and default_style_config.get("colors"):
+                try:
+                    # Buatkan style khusus independen untuk layer ini (style_{store_name})
+                    # sehingga perubahan default style workspace di kemudian hari TIDAK AKAN mengubah style layer ini!
+                    layer_style_name = f"style_{store_name}"
+                    sld_xml = generate_raster_sld(
+                        style_name=layer_style_name,
+                        color_entries=default_style_config.get("colors", []),
+                        style_type=default_style_config.get("style_type", "intervals")
                     )
                     apply_sld_to_layer(
                         workspace=workspace.ws_name,
                         layer_name=store_name,
-                        style_name=default_style_name,
-                        sld_xml=generic_sld
+                        style_name=layer_style_name,
+                        sld_xml=sld_xml
                     )
-                else:
-                    assign_style_to_layer(workspace.ws_name, store_name, default_style_name)
-            except Exception as se:
-                print(f"Info: Style default diterapkan: {se}")
+                    if not meta.metadata_json or not isinstance(meta.metadata_json, dict):
+                        meta.metadata_json = {}
+                    meta.metadata_json["symbology"] = {
+                        "style_type": default_style_config.get("style_type", "intervals"),
+                        "classes": default_style_config.get("colors", []),
+                        "classes_count": len(default_style_config.get("colors", [])),
+                        "color_ramp": default_style_config.get("color_ramp", "default"),
+                        "inherited_from_workspace": True,
+                        "updated_at": datetime.utcnow().isoformat()
+                    }
+                    flag_modified(meta, "metadata_json")
+                    db.commit()
+                except Exception as se:
+                    print(f"Info: Gagal menerapkan default style workspace ke layer: {se}")
+            # Jika workspace TIDAK memiliki default style:
+            # JANGAN buat default_ws_xxxx! Biarkan GeoServer menggunakan visualisasi standarnya (raster).
 
             result = {
                 "success": True,
@@ -260,7 +280,7 @@ async def publish_geosocial_layer(
     try:
         # Pastikan workspace ada di GeoServer
         try:
-            geo.create_workspace(workspace_name)
+            geoserver_service_client.create_workspace(workspace_name)
         except Exception:
             pass
 
@@ -326,10 +346,10 @@ async def publish_geosocial_layer(
             }
 
         elif file_ext in RASTER_FORMATS:
-            success = geo.create_coveragestore(
-                layer_name=store_name, 
-                path=file_path, 
-                workspace=workspace_name
+            success = geoserver_service_client.create_coveragestore(
+                store_name=store_name, 
+                workspace_name=workspace_name,
+                raster_path=file_path
             )
             if success:
                 default_style = f"default_{workspace_name}"
@@ -471,6 +491,7 @@ def list_layers(
                 "bbox": [minx, miny, maxx, maxy] if minx is not None else None,
                 "wms_url": f"{wms_base}/{workspace_name}/wms",
                 "created_at": layer.created_at,
+                "metadata_json": layer.metadata_json,
             }
             for layer, workspace_name, workspace_display_name, minx, miny, maxx, maxy in layers_result
         ]
@@ -498,7 +519,7 @@ def get_layer_metadata(
     layer_name: str,
     current_user: Users = Depends(get_current_user)
 ):
-    layer = geo.get_layer(layer_name)
+    layer = geoserver_service_client.get_layer(layer_name)
     return layer
 
 # Layer preview URL format:
@@ -526,6 +547,8 @@ def get_layer_preview(
     
 
 class ColorEntryItem(BaseModel):
+    min: Optional[float] = None
+    max: Optional[float] = None
     quantity: float
     color: str
     opacity: float = 1.0
@@ -533,8 +556,93 @@ class ColorEntryItem(BaseModel):
 
 class UpdateRasterStyleRequest(BaseModel):
     layer_id: int
-    style_type: Optional[str] = "values" # "values", "intervals", or "ramp"
+    style_type: Optional[str] = "intervals" # "values", "intervals", or "ramp"
+    classification_method: Optional[str] = "jenks"
+    classes_count: Optional[int] = None
+    color_ramp: Optional[str] = None
     colors: List[ColorEntryItem]
+
+class ClassifyPreviewRequest(BaseModel):
+    n_classes: int = 5
+    method: str = "jenks" # "jenks", "equal_interval", "quantile"
+    color_ramp: Optional[str] = "cyan_blue_magenta"
+    custom_colors: Optional[List[str]] = None
+
+@router.get("/{layer_id}/raster-info")
+def get_layer_raster_info(
+    layer_id: int,
+    db: Session = Depends(get_db),
+    current_user: Users = Depends(get_current_user)
+):
+    """
+    Mengambil data statistik raster (Min, Max, Mean, Std, NoData)
+    serta konfigurasi klasifikasi & rentang yang sudah tersimpan sebelumnya.
+    """
+    layer = db.query(Layer).filter(Layer.id == layer_id).first()
+    if not layer:
+        raise HTTPException(status_code=404, detail="Layer tidak ditemukan")
+    if layer.layer_type != "raster":
+        raise HTTPException(status_code=400, detail="Endpoint ini hanya untuk layer Raster")
+
+    stats = None
+    if layer.file_path and os.path.exists(layer.file_path):
+        try:
+            stats = get_raster_statistics(layer.file_path)
+            # Simpan atau sinkronkan statistik ke metadata_json
+            if not layer.metadata_json:
+                layer.metadata_json = {}
+            layer.metadata_json["statistics"] = stats
+            flag_modified(layer, "metadata_json")
+            db.commit()
+        except Exception as e:
+            print(f"Error reading raster statistics: {e}")
+
+    symbology = None
+    if layer.metadata_json and isinstance(layer.metadata_json, dict):
+        symbology = layer.metadata_json.get("symbology")
+
+    return {
+        "success": True,
+        "layer_id": layer.id,
+        "layer_name": layer.name,
+        "statistics": stats or (layer.metadata_json.get("statistics") if layer.metadata_json else None),
+        "saved_symbology": symbology,
+        "available_ramps": list(COLOR_RAMPS.keys())
+    }
+
+@router.post("/{layer_id}/classify-preview")
+def preview_layer_classification(
+    layer_id: int,
+    req: ClassifyPreviewRequest,
+    db: Session = Depends(get_db),
+    current_user: Users = Depends(get_current_user)
+):
+    """
+    Menghitung rentang kelas (breaks), min-max per interval, dan warna
+    menggunakan metode Natural Breaks (Jenks), Equal Interval, atau Quantile.
+    """
+    layer = db.query(Layer).filter(Layer.id == layer_id).first()
+    if not layer:
+        raise HTTPException(status_code=404, detail="Layer tidak ditemukan")
+    if layer.layer_type != "raster":
+        raise HTTPException(status_code=400, detail="Endpoint ini hanya untuk layer Raster")
+    if not layer.file_path or not os.path.exists(layer.file_path):
+        raise HTTPException(status_code=404, detail="Berkas GeoTIFF tidak ditemukan di storage server")
+
+    try:
+        classification = classify_raster_data(
+            file_path=layer.file_path,
+            n_classes=req.n_classes,
+            method=req.method,
+            color_ramp=req.color_ramp or "cyan_blue_magenta",
+            custom_colors=req.custom_colors
+        )
+        return {
+            "success": True,
+            "data": classification
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Gagal mengklasifikasi raster: {str(e)}")
 
 @router.post("/update-style")
 def update_layer_style(
@@ -542,6 +650,10 @@ def update_layer_style(
     db: Session = Depends(get_db),
     current_user: Users = Depends(get_current_user)
 ):
+    """
+    Menerapkan SLD ke GeoServer DAN menyimpan konfigurasi nilai, rentang,
+    dan warna ke metadata_json di database sehingga dapat dimuat kembali.
+    """
     layer = db.query(Layer).filter(Layer.id == req.layer_id).first()
     if not layer:
         raise HTTPException(status_code=404, detail="Layer tidak ditemukan")
@@ -553,10 +665,11 @@ def update_layer_style(
     style_name = f"style_{layer.geoserver_name}"
 
     try:
+        # 1. Generate & Terapkan SLD ke GeoServer
         sld_xml = generate_raster_sld(
             style_name=style_name,
             color_entries=[item.dict() for item in req.colors],
-            style_type=req.style_type or "values"
+            style_type=req.style_type or "intervals"
         )
         apply_sld_to_layer(
             workspace=workspace.ws_name,
@@ -564,13 +677,40 @@ def update_layer_style(
             style_name=style_name,
             sld_xml=sld_xml
         )
+
+        # 2. SIMPAN konfigurasi symbology secara permanen ke metadata_json
+        if not layer.metadata_json or not isinstance(layer.metadata_json, dict):
+            layer.metadata_json = {}
+
+        layer.metadata_json["symbology"] = {
+            "style_type": req.style_type or "intervals",
+            "classification_method": req.classification_method or "jenks",
+            "classes_count": len(req.colors),
+            "color_ramp": req.color_ramp or "cyan_blue_magenta",
+            "classes": [item.dict() for item in req.colors],
+            "updated_at": datetime.utcnow().isoformat()
+        }
+
+        # Perbarui statistik jika tersedia
+        if layer.file_path and os.path.exists(layer.file_path):
+            try:
+                layer.metadata_json["statistics"] = get_raster_statistics(layer.file_path)
+            except Exception:
+                pass
+
+        flag_modified(layer, "metadata_json")
+        db.commit()
+        db.refresh(layer)
+
         return {
             "success": True,
-            "detail": f"Style untuk layer '{layer.name}' berhasil diperbarui!",
-            "style_name": style_name
+            "detail": f"Klasifikasi & style untuk layer '{layer.name}' berhasil disimpan dan diterapkan!",
+            "style_name": style_name,
+            "symbology": layer.metadata_json.get("symbology")
         }
     except Exception as e:
         print(f"Error updating style: {e}")
+        db.rollback()
         raise HTTPException(status_code=500, detail=f"Gagal memperbarui style: {str(e)}")
 
 
@@ -622,12 +762,12 @@ def delete_layer(
                     pass
             else:
                 try:
-                    geo.delete_coveragestore(coveragestore_name=layer.geoserver_name, workspace=workspace.ws_name)
+                    geoserver_service_client.delete_coveragestore(store_name=layer.geoserver_name, workspace_name=workspace.ws_name)
                 except Exception as ge:
                     print(f"Peringatan: Gagal menghapus coverage store di GeoServer: {ge}")
 
             try:
-                geo.delete_style(style_name=f"style_{layer.geoserver_name}")
+                geoserver_service_client.delete_style(style_name=f"style_{layer.geoserver_name}")
             except Exception:
                 pass
 

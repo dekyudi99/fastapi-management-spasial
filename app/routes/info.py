@@ -1,18 +1,14 @@
-from config.geoserver_auth import get_geoserver_connection
 from fastapi import APIRouter
+from services.geoserver_service_client import geoserver_service_client
 
 router = APIRouter(prefix="/info", tags=["Info"])
-
-geo = get_geoserver_connection()
 
 # Menampilkan versi GeoServer
 @router.get("/version")
 def get_version():
-    geo_version = geo.get_version()
-    return geo_version
+    return geoserver_service_client.get_version()
 
 # Menampilkan status GeoServer
 @router.get("/status")
 def get_status():
-    status = geo.get_status()
-    return status
+    return geoserver_service_client.get_status()

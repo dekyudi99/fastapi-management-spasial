@@ -11,7 +11,24 @@ from sqlalchemy import func
 from services.hash_id import encode_id, decode_id
 from services.log_service import create_log
 
+from services.api_key_service import verify_api_key
+
 router = APIRouter(prefix="/api-key", tags=["Api Key"])
+
+@router.get("/verify", status_code=status.HTTP_200_OK)
+def verify_api_key_endpoint(
+    key: ApiKey = Depends(verify_api_key)
+):
+    """
+    Endpoint untuk validasi API Key oleh service lain (GeoServer Microservice / S2S).
+    Menghindari duplikasi database user/key di microservice lain.
+    """
+    return {
+        "valid": True,
+        "key_id": key.id,
+        "project_id": key.project_id,
+        "name": key.name
+    }
 
 @router.post("/{hashed_id}", status_code=status.HTTP_201_CREATED)
 def create_api_key(

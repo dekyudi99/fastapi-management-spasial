@@ -1,0 +1,255 @@
+import os
+import requests
+from typing import Dict, Any, Optional, List
+import logging
+from dotenv import load_dotenv
+
+load_dotenv()
+
+logger = logging.getLogger("astragis.geoserver_client")
+
+class GeoServerServiceClient:
+    """
+    Client SDK untuk berkomunikasi dengan geoserver-microservice.
+    Menyediakan interface terpadu (DRY) untuk semua operasi GeoServer dari AstraGIS Core.
+    Semua request diamankan menggunakan API Key (X-API-Key).
+    """
+
+    def __init__(self, service_url: Optional[str] = None, api_key: Optional[str] = None):
+        self.service_url = (
+            service_url or 
+            os.getenv("GEOSERVER_MICROSERVICE_URL") or 
+            "http://localhost:8005"
+        ).rstrip("/")
+        self.api_key = (
+            api_key or 
+            os.getenv("GEOSERVER_MICROSERVICE_API_KEY") or 
+            os.getenv("API_KEY") or 
+            "rahasia_s2s_geoserver_key_2026"
+        )
+        self.timeout = 60
+
+    def _url(self, path: str) -> str:
+        return f"{self.service_url}/{path.lstrip('/')}"
+
+    def _headers(self, extra: Optional[Dict[str, str]] = None) -> Dict[str, str]:
+        headers = {
+            "X-API-Key": self.api_key
+        }
+        if extra:
+            headers.update(extra)
+        return headers
+
+    def is_service_available(self) -> bool:
+        try:
+            res = requests.get(self._url("/health"), timeout=3)
+            return res.status_code == 200
+        except Exception:
+            return False
+
+    def create_workspace(self, workspace_name: str) -> bool:
+        try:
+            res = requests.post(
+                self._url("/workspaces"),
+                json={"workspace_name": workspace_name},
+                headers=self._headers(),
+                timeout=self.timeout
+            )
+            return res.status_code in (200, 201)
+        except Exception as e:
+            logger.error(f"Error creating workspace {workspace_name}: {e}")
+            return False
+
+    def delete_workspace(self, workspace_name: str, recurse: bool = True) -> bool:
+        try:
+            res = requests.delete(
+                self._url(f"/workspaces/{workspace_name}?recurse={str(recurse).lower()}"),
+                headers=self._headers(),
+                timeout=self.timeout
+            )
+            return res.status_code in (200, 204)
+        except Exception as e:
+            logger.error(f"Error deleting workspace {workspace_name}: {e}")
+            return False
+
+    def list_workspaces(self) -> List[Dict[str, Any]]:
+        try:
+            res = requests.get(self._url("/workspaces"), headers=self._headers(), timeout=self.timeout)
+            if res.status_code == 200:
+                return res.json()
+        except Exception as e:
+            logger.error(f"Error listing workspaces: {e}")
+        return []
+
+    def publish_vector(
+        self,
+        workspace_name: str,
+        layer_name: str,
+        file_tuple: tuple,  # (filename, fileobj, content_type)
+        table_name: Optional[str] = None,
+        simplify_tolerance: Optional[float] = None
+    ) -> Dict[str, Any]:
+        data = {
+            "workspace_name": workspace_name,
+            "layer_name": layer_name
+        }
+        if table_name:
+            data["table_name"] = table_name
+        if simplify_tolerance is not None:
+            data["simplify_tolerance"] = str(simplify_tolerance)
+
+        files = {"file": file_tuple}
+        res = requests.post(
+            self._url("/layers/publish-vector"),
+            data=data,
+            files=files,
+            headers=self._headers(),
+            timeout=self.timeout
+        )
+        if res.status_code not in (200, 201):
+            raise RuntimeError(f"Microservice publish vector error: {res.text}")
+        return res.json()
+
+    def publish_raster(
+        self,
+        workspace_name: str,
+        layer_name: str,
+        file_tuple: tuple,  # (filename, fileobj, content_type)
+        store_name: Optional[str] = None,
+        style_config_json: Optional[str] = None
+    ) -> Dict[str, Any]:
+        data = {
+            "workspace_name": workspace_name,
+            "layer_name": layer_name
+        }
+        if store_name:
+            data["store_name"] = store_name
+        if style_config_json:
+            data["style_config"] = style_config_json
+
+        files = {"file": file_tuple}
+        res = requests.post(
+            self._url("/layers/publish-raster"),
+            data=data,
+            files=files,
+            headers=self._headers(),
+            timeout=self.timeout
+        )
+        if res.status_code not in (200, 201):
+            raise RuntimeError(f"Microservice publish raster error: {res.text}")
+        return res.json()
+
+    def delete_layer(self, workspace_name: str, layer_name: str, recurse: bool = True) -> bool:
+        try:
+            res = requests.delete(
+                self._url(f"/layers/{workspace_name}/{layer_name}?recurse={str(recurse).lower()}"),
+                headers=self._headers(),
+                timeout=self.timeout
+            )
+            return res.status_code in (200, 204)
+        except Exception as e:
+            logger.error(f"Error deleting layer {layer_name}: {e}")
+            return False
+
+    def get_layer(self, layer_name: str, workspace_name: Optional[str] = None) -> Optional[Dict[str, Any]]:
+        try:
+            url = self._url(f"/layers/{layer_name}")
+            params = {"workspace": workspace_name} if workspace_name else {}
+            res = requests.get(url, params=params, headers=self._headers(), timeout=self.timeout)
+            if res.status_code == 200:
+                return res.json()
+        except Exception as e:
+            logger.error(f"Error fetching layer {layer_name}: {e}")
+        return None
+
+    def apply_style(
+        self,
+        workspace_name: str,
+        layer_name: str,
+        style_name: str,
+        sld_xml: Optional[str] = None
+    ) -> bool:
+        res = requests.post(
+            self._url("/styles/apply"),
+            json={
+                "workspace_name": workspace_name,
+                "layer_name": layer_name,
+                "style_name": style_name,
+                "sld_xml": sld_xml
+            },
+            headers=self._headers(),
+            timeout=self.timeout
+        )
+        return res.status_code == 200
+
+    def delete_style(self, style_name: str, workspace_name: Optional[str] = None, recurse: bool = True) -> bool:
+        try:
+            url = self._url(f"/styles/{style_name}")
+            params = {"workspace": workspace_name, "recurse": str(recurse).lower()} if workspace_name else {"recurse": str(recurse).lower()}
+            res = requests.delete(url, params=params, headers=self._headers(), timeout=self.timeout)
+            return res.status_code in (200, 204)
+        except Exception as e:
+            logger.error(f"Error deleting style {style_name}: {e}")
+            return False
+
+    def get_wms_capabilities(self, workspace_name: Optional[str] = None) -> Dict[str, Any]:
+        url = self._url("/wms/capabilities")
+        params = {"workspace": workspace_name} if workspace_name else {}
+        res = requests.get(url, params=params, headers=self._headers(), timeout=self.timeout)
+        if res.status_code == 200:
+            return res.json()
+        raise RuntimeError(f"Gagal mengambil WMS capabilities: {res.text}")
+
+    def list_datastores(self, workspace_name: Optional[str] = None) -> List[Dict[str, Any]]:
+        url = self._url("/stores")
+        params = {"workspace": workspace_name} if workspace_name else {}
+        res = requests.get(url, params=params, headers=self._headers(), timeout=self.timeout)
+        return res.json() if res.status_code == 200 else []
+
+    def get_datastore(self, store_name: str, workspace_name: Optional[str] = None) -> Optional[Dict[str, Any]]:
+        url = self._url(f"/stores/{workspace_name}/{store_name}" if workspace_name else f"/stores/{store_name}")
+        res = requests.get(url, headers=self._headers(), timeout=self.timeout)
+        return res.json() if res.status_code == 200 else None
+
+    def list_coveragestores(self, workspace_name: Optional[str] = None) -> List[Dict[str, Any]]:
+        url = self._url("/coverage-stores")
+        params = {"workspace": workspace_name} if workspace_name else {}
+        res = requests.get(url, params=params, headers=self._headers(), timeout=self.timeout)
+        return res.json() if res.status_code == 200 else []
+
+    def get_coveragestore(self, store_name: str, workspace_name: Optional[str] = None) -> Optional[Dict[str, Any]]:
+        url = self._url(f"/coverage-stores/{workspace_name}/{store_name}" if workspace_name else f"/coverage-stores/{store_name}")
+        res = requests.get(url, headers=self._headers(), timeout=self.timeout)
+        return res.json() if res.status_code == 200 else None
+
+    def delete_coveragestore(self, workspace_name: str, store_name: str, recurse: bool = True) -> bool:
+        try:
+            res = requests.delete(
+                self._url(f"/coverage-stores/{workspace_name}/{store_name}?recurse={str(recurse).lower()}"),
+                headers=self._headers(),
+                timeout=self.timeout
+            )
+            return res.status_code in (200, 204)
+        except Exception as e:
+            logger.error(f"Error deleting coverage store {store_name}: {e}")
+            return False
+
+    def get_version(self) -> Dict[str, Any]:
+        try:
+            res = requests.get(self._url("/health"), headers=self._headers(), timeout=5)
+            if res.status_code == 200:
+                return {"version": "2.28.2", "microservice": "geoserver-microservice"}
+        except Exception:
+            pass
+        return {"version": "unknown"}
+
+    def get_status(self) -> Dict[str, Any]:
+        try:
+            res = requests.get(self._url("/health"), headers=self._headers(), timeout=5)
+            if res.status_code == 200:
+                return res.json()
+        except Exception:
+            pass
+        return {"status": "unavailable"}
+
+geoserver_service_client = GeoServerServiceClient()

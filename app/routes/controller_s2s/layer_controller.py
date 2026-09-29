@@ -10,7 +10,7 @@ import re
 import httpx
 
 from config.database import get_db, engine
-from config.geoserver_auth import get_geoserver_connection
+from services.geoserver_service_client import geoserver_service_client
 from models.layer import Layer
 from models.workspace import Workspace
 from models.project import Project
@@ -21,7 +21,7 @@ from services.log_service import create_log
 from services.sld_to_layer import apply_sld_to_layer, generate_raster_sld
 
 router = APIRouter()
-geo = get_geoserver_connection()
+geo = geoserver_service_client
 
 
 # ── 3. GET /layers (Daftar Layer Pengguna untuk Multi-User Client) ─────────
@@ -194,11 +194,11 @@ async def s2s_delete_layer(
                     print(f"[S2S] Peringatan: Gagal menghapus featuretype GeoServer: {fe}")
             else:
                 try:
-                    geo.delete_coveragestore(coveragestore_name=layer.geoserver_name, workspace=workspace.ws_name)
+                    geoserver_service_client.delete_coveragestore(store_name=layer.geoserver_name, workspace_name=workspace.ws_name)
                 except Exception as ge:
                     print(f"[S2S] Peringatan: Gagal menghapus coverage store GeoServer: {ge}")
             try:
-                geo.delete_style(style_name=f"style_{layer.geoserver_name}")
+                geoserver_service_client.delete_style(style_name=f"style_{layer.geoserver_name}")
             except Exception:
                 pass
 
@@ -429,7 +429,7 @@ def s2s_create_workspace(
             raise HTTPException(status_code=400, detail="Nama workspace tidak boleh kosong.")
 
         ws_technical = f"ws_{secrets.token_hex(4)}"
-        success = geo.create_workspace(workspace=ws_technical)
+        success = geoserver_service_client.create_workspace(ws_technical)
         if not success:
             raise HTTPException(status_code=500, detail="Gagal membuat workspace di GeoServer.")
 
@@ -533,7 +533,7 @@ def s2s_delete_workspace(
         ws_tech = ws.ws_name
 
         try:
-            geo.delete_workspace(workspace=ws_tech)
+            geoserver_service_client.delete_workspace(workspace_name=ws_tech)
         except Exception as ge:
             print(f"[S2S] Peringatan: GeoServer delete workspace gagal: {ge}")
 

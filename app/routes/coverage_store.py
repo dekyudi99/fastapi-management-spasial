@@ -1,4 +1,3 @@
-from config.geoserver_auth import get_geoserver_connection
 from fastapi import APIRouter, Form, File, UploadFile, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 import os
@@ -14,25 +13,25 @@ from services.auth_service import get_current_user
 
 FILE_PATH = "D:/proyek-gis/data_raster"
 
+from services.geoserver_service_client import geoserver_service_client
+
 router = APIRouter(prefix="/coveragestore", tags=["Coverage Store"])
-geo = get_geoserver_connection()
 
 #Untuk melihat daftar coverage store yang sudah ada
 @router.get("/list")
 async def list_coveragestores(
     current_user: Users = Depends(get_current_user)
 ):
-    response = geo.get_coveragestores()
-    return response
+    return geoserver_service_client.list_coveragestores()
 
 #Untuk melihat detail sebuah coverage store tertentu
 @router.get("/coveragestore/{store_name}")
 def get_coveragestore_metadata(
-    name: str,
+    store_name: str,
     current_user: Users = Depends(get_current_user)
 ):
-    store = geo.get_coveragestore(coveragestore_name=name)
-    return store
+    store = geoserver_service_client.get_coveragestore(store_name=store_name)
+    return store or {}
 
 @router.post("/print/rasterio")
 def get_rasterio(
