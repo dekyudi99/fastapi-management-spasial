@@ -29,12 +29,40 @@ class GeoServerServiceClient:
         )
         self.timeout = 60
 
+    def get_active_primary_key(self) -> str:
+        """
+        Ambil kunci PRIMARY aktif langsung dari database lokal secara dinamis.
+        Fallback ke environment variable jika tidak ditemukan.
+        """
+        try:
+            from config.database import SessionLocal
+            from models.api_key import ApiKey
+            from models.users import Users
+            db = SessionLocal()
+            try:
+                pk = db.query(ApiKey).filter(
+                    ApiKey.key_prefix == "gsvc_pk_",
+                    ApiKey.is_active == True,
+                    ApiKey.api_key_secret.isnot(None)
+                ).first()
+                if pk and pk.api_key_secret:
+                    return pk.api_key_secret
+            finally:
+                db.close()
+        except Exception:
+            pass
+        return os.getenv("GEOSERVER_MICROSERVICE_API_KEY") or self.api_key
+
     def _url(self, path: str) -> str:
-        return f"{self.service_url}/{path.lstrip('/')}"
+        clean_path = path.lstrip('/')
+        if not clean_path.startswith("api/v1/"):
+            clean_path = f"api/v1/{clean_path}"
+        return f"{self.service_url}/{clean_path}"
 
     def _headers(self, extra: Optional[Dict[str, str]] = None) -> Dict[str, str]:
+        current_key = self.get_active_primary_key()
         headers = {
-            "X-API-Key": self.api_key
+            "X-API-Key": current_key
         }
         if extra:
             headers.update(extra)
@@ -252,4 +280,105 @@ class GeoServerServiceClient:
             pass
         return {"status": "unavailable"}
 
+    # ==========================================
+    # API Key Management (Microservice S2S)
+    # ==========================================
+    def create_api_key(
+        self,
+        name: str,
+        key_type: str = "STANDARD",
+        owner_info: Optional[str] = None
+    ) -> Dict[str, Any]:
+        payload = {
+            "name": name,
+            "key_type": key_type,
+            "owner_info": owner_info
+        }
+        res = requests.post(
+            self._url("/api-keys"),
+            json=payload,
+            headers=self._headers(),
+            timeout=self.timeout
+        )
+        if res.status_code in (200, 201):
+            return res.json()
+        raise RuntimeError(f"Gagal membuat API key di microservice: {res.text}")
+
+    def list_api_keys(self) -> List[Dict[str, Any]]:
+        res = requests.get(self._url("/api-keys"), headers=self._headers(), timeout=self.timeout)
+        if res.status_code == 200:
+            return res.json()
+        return []
+
+    def deactivate_api_key(self, key_id: str) -> bool:
+        try:
+            res = requests.delete(self._url(f"/api-keys/{key_id}"), headers=self._headers(), timeout=self.timeout)
+            return res.status_code in (200, 204)
+        except Exception as e:
+            logger.error(f"Error deactivating API key {key_id}: {e}")
+            return False
+
+    def toggle_api_key(self, key_id: str) -> bool:
+        try:
+            res = requests.patch(self._url(f"/api-keys/{key_id}/toggle"), headers=self._headers(), timeout=self.timeout)
+            return res.status_code == 200
+        except Exception as e:
+            logger.error(f"Error toggling API key {key_id}: {e}")
+            return False
+
+    def get_audit_logs(
+        self,
+        api_key_id: Optional[str] = None,
+        action: Optional[str] = None,
+        limit: int = 100,
+        offset: int = 0
+    ) -> Dict[str, Any]:
+        params = {"limit": limit, "offset": offset}
+        if api_key_id:
+            params["api_key_id"] = api_key_id
+        if action:
+            params["action"] = action
+        res = requests.get(self._url("/logs"), params=params, headers=self._headers(), timeout=self.timeout)
+        if res.status_code == 200:
+            return res.json()
+        return {"total": 0, "offset": offset, "limit": limit, "data": []}
+
+    def get_key_usage(self, plain_key: str) -> Dict[str, Any]:
+        try:
+            res = requests.get(self._url("/api-keys/usage"), headers={"X-API-Key": plain_key}, timeout=5)
+            if res.status_code == 200:
+                return res.json()
+        except Exception as e:
+            logger.warning(f"Could not fetch disk usage: {e}")
+        return {
+            "total_bytes": 0,
+            "total_readable": "0 B",
+            "raster_bytes": 0,
+            "raster_readable": "0 B",
+            "vector_bytes": 0,
+            "vector_readable": "0 B",
+            "total_layers": 0,
+            "raster_count": 0,
+            "vector_count": 0
+        }
+
+    def test_connection(self) -> Dict[str, Any]:
+        try:
+            res = requests.get(self._url("/health"), timeout=5)
+            if res.status_code == 200:
+                data = res.json()
+                return {
+                    "success": True,
+                    "connected": bool(data.get("geoserver_connected")),
+                    "service_status": data.get("status", "ok"),
+                    "geoserver_version": data.get("geoserver_version"),
+                    "latency_ms": data.get("latency_ms", 0),
+                    "geoserver_url": data.get("geoserver_url"),
+                    "service_url": self.service_url
+                }
+            return {"success": False, "connected": False, "error": f"HTTP {res.status_code}"}
+        except Exception as e:
+            return {"success": False, "connected": False, "error": str(e)}
+
 geoserver_service_client = GeoServerServiceClient()
+

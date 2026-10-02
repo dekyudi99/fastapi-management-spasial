@@ -8,3 +8,5 @@ __pycache__/
 geoserver_data/
 data_raster/
 data_vector/
+
+.agents

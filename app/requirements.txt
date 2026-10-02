@@ -31,3 +31,6 @@ xmltodict
 bcrypt
 PyJWT
 sqids
+
+# Other
+jenkspy

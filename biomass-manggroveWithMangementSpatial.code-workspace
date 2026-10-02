@@ -11,6 +11,9 @@
 		},
 		{
 			"path": "../FlowGIS"
+		},
+		{
+			"path": "../geoserver-microservice"
 		}
 	],
 	"settings": {

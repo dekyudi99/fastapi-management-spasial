@@ -11,6 +11,7 @@ import random
 from datetime import datetime, timedelta
 from models.email_otp import EmailOTP
 from services.email_service import send_otp_email_sync
+from services.api_key_service import ensure_user_api_key
 
 router = APIRouter(prefix="/auth", tags=["Auth"])
 
@@ -128,12 +129,25 @@ def login(
     }
     
     access_token = create_access_token(data=payload)
+
+    s2s_key = None
+    is_key_active = True
+    try:
+        k = ensure_user_api_key(user, db)
+        if k:
+            is_key_active = bool(k.is_active)
+            if k.is_active:
+                s2s_key = k.plain_key
+    except Exception:
+        pass
     
     return {
         "success": True,
         "detail": f"Welcome {user.username}",
         "access_token": access_token,
-        "type": "bearer"
+        "type": "bearer",
+        "s2s_key": s2s_key,
+        "is_active": is_key_active
     }
 
 @router.post("/send-register-otp")
@@ -231,16 +245,29 @@ def verify_email(
     }
     access_token = create_access_token(data=payload)
 
+    s2s_key = None
+    is_key_active = True
+    try:
+        k = ensure_user_api_key(user, db)
+        if k:
+            is_key_active = bool(k.is_active)
+            if k.is_active:
+                s2s_key = k.plain_key
+    except Exception:
+        pass
+
     return {
         "success": True,
         "detail": "Email verified successfully! You are now logged in.",
         "access_token": access_token,
         "type": "bearer",
+        "s2s_key": s2s_key,
         "user": {
             "id": user.id,
             "username": user.username,
             "email": user.email,
-            "role": user.role
+            "role": user.role,
+            "s2s_key": s2s_key
         }
     }
 
@@ -466,4 +493,28 @@ def change_password(
     return {
         "success": True,
         "detail": "Your password has been updated successfully!"
+    }
+
+
+@router.get("/me")
+def get_me(
+    current_user: Users = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Mengambil profil lengkap pengguna termasuk S2S API Key untuk koneksi GeoServer Microservice"""
+    api_key_record = ensure_user_api_key(current_user, db)
+    s2s_key = api_key_record.api_key_secret if api_key_record else None
+
+    return {
+        "success": True,
+        "data": {
+            "id": current_user.id,
+            "username": current_user.username,
+            "email": current_user.email,
+            "role": current_user.role,
+            "is_verified": current_user.is_verified,
+            "s2s_key": s2s_key,
+            "masked_key": api_key_record.masked_key if api_key_record else None,
+            "created_at": current_user.created_at.isoformat() if current_user.created_at else None
+        }
     }
