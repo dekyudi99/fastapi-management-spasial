@@ -64,8 +64,10 @@ def get_all_users(
             "api_key": {
                 "id": user_key.id if user_key else None,
                 "masked_key": user_key.masked_key if user_key else None,
+                "key_prefix": user_key.key_prefix if user_key else None,
                 "is_active": user_key.is_active if user_key else False,
-                "microservice_key_id": user_key.microservice_key_id if user_key else None
+                "microservice_key_id": user_key.microservice_key_id if user_key else None,
+                "full_key": user_key.api_key_secret if (user_key and user_key.api_key_secret) else None
             } if user_key else None
         })
 
@@ -155,7 +157,10 @@ def toggle_user_api_key(
 ):
     api_key = db.query(ApiKey).filter(ApiKey.user_id == user_id).first()
     if not api_key:
-        raise HTTPException(status_code=404, detail="User belum memiliki API Key.")
+        raise HTTPException(
+            status_code=404, 
+            detail="User belum memiliki API Key. Silakan buatkan API Key baru terlebih dahulu."
+        )
 
     new_status = not api_key.is_active
     api_key.is_active = new_status
@@ -189,6 +194,7 @@ def toggle_microservice_api_key(
     return {"success": True, "detail": "Status API Key microservice berhasil diubah."}
 
 @router.post("/users/{user_id}/api-key/refresh")
+@router.post("/users/{user_id}/api-key/generate")
 def refresh_user_api_key(
     user_id: int,
     db: Session = Depends(get_db),
@@ -199,6 +205,7 @@ def refresh_user_api_key(
         raise HTTPException(status_code=404, detail="User tidak ditemukan.")
 
     api_key = db.query(ApiKey).filter(ApiKey.user_id == user_id).first()
+    is_new_creation = (api_key is None)
 
     if api_key and api_key.microservice_key_id:
         try:
@@ -206,14 +213,7 @@ def refresh_user_api_key(
         except Exception:
             pass
 
-    owner_info = json.dumps({
-        "user_id": user.id,
-        "username": user.username,
-        "email": user.email,
-        "refreshed_by_admin": admin.username
-    })
-
-    is_admin_user = getattr(user, 'role', 'user') == 'admin'
+    is_admin_user = (getattr(user, 'role', 'user') == 'admin')
     key_type = "PRIMARY" if is_admin_user else "STANDARD"
     prefix = "gsvc_pk_" if is_admin_user else "gsvc_sk_"
 
@@ -222,7 +222,7 @@ def refresh_user_api_key(
         "username": user.username,
         "email": user.email,
         "role": user.role,
-        "refreshed_by_admin": admin.username
+        "generated_by_admin": admin.username
     })
 
     res = geoserver_service_client.create_api_key(
@@ -255,10 +255,17 @@ def refresh_user_api_key(
     db.commit()
     db.refresh(api_key)
 
+    detail_msg = (
+        f"API Key baru berhasil dibuatkan untuk {user.username}!"
+        if is_new_creation else
+        f"API Key untuk {user.username} berhasil direfresh!"
+    )
+
     return {
         "success": True,
-        "detail": "API Key user berhasil direfresh!",
+        "detail": detail_msg,
         "api_key": plain_key,
+        "full_key": plain_key,
         "masked_key": api_key.masked_key,
         "is_active": api_key.is_active
     }
