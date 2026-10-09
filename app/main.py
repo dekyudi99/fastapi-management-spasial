@@ -42,7 +42,7 @@ default_origins = [
     "http://localhost:5173",
     "http://localhost:5175",
     "http://localhost:3000",
-    "https://astragis.ikya.my.id",
+    "https://voxagis.wefgis.com",
     "https://flowgis.ikya.my.id",
 ]
 
