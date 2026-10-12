@@ -55,8 +55,8 @@ def refresh_my_api_key(
     db: Session = Depends(get_db)
 ):
     """
-    Me-refresh API Key pengguna.
-    API Key lama akan dinonaktifkan di microservice, dan API Key baru akan diterbitkan.
+    Me-refresh nilai rahasia API Key pengguna (in-place rotation).
+    ID kunci (UUID) dipertahankan sehingga seluruh data spasial, layer, dan workspace tidak hilang.
     """
     api_key = db.query(ApiKey).filter(ApiKey.user_id == current_user.id).first()
 
@@ -68,31 +68,39 @@ def refresh_my_api_key(
         )
 
     try:
-        # Nonaktifkan kunci lama di microservice jika ada
+        plain_key = None
+        key_id = None
+
+        # Jika user sudah memiliki kunci di microservice, rotasikan nilainya (pertahankan UUID & data!)
         if api_key and api_key.microservice_key_id:
             try:
-                geoserver_service_client.deactivate_api_key(api_key.microservice_key_id)
-            except Exception:
+                res = geoserver_service_client.rotate_api_key(api_key.microservice_key_id)
+                plain_key = res.get("api_key")
+                key_id = res.get("id")
+            except Exception as e:
+                # Fallback jika record di microservice terhapus
                 pass
 
-        is_admin = getattr(current_user, 'role', 'user') == 'admin'
-        key_type = "PRIMARY" if is_admin else "STANDARD"
-        prefix = "gsvc_pk_" if is_admin else "gsvc_sk_"
+        if not plain_key:
+            is_admin = getattr(current_user, 'role', 'user') == 'admin'
+            key_type = "PRIMARY" if is_admin else "STANDARD"
+            prefix = "gsvc_pk_" if is_admin else "gsvc_sk_"
 
-        owner_info = json.dumps({
-            "user_id": current_user.id,
-            "username": current_user.username,
-            "email": current_user.email,
-            "role": current_user.role
-        })
-        res = geoserver_service_client.create_api_key(
-            name=f"Key - {current_user.username}",
-            key_type=key_type,
-            owner_info=owner_info
-        )
-        plain_key = res.get("api_key")
-        key_id = res.get("id")
+            owner_info = json.dumps({
+                "user_id": current_user.id,
+                "username": current_user.username,
+                "email": current_user.email,
+                "role": current_user.role
+            })
+            res = geoserver_service_client.create_api_key(
+                name=f"Key - {current_user.username}",
+                key_type=key_type,
+                owner_info=owner_info
+            )
+            plain_key = res.get("api_key")
+            key_id = res.get("id")
 
+        prefix = plain_key[:8] if plain_key else "gsvc_sk_"
         if not api_key:
             api_key = ApiKey(
                 user_id=current_user.id,
@@ -114,13 +122,20 @@ def refresh_my_api_key(
         db.commit()
         db.refresh(api_key)
 
+        disk_usage = None
+        try:
+            disk_usage = geoserver_service_client.get_key_usage(plain_key)
+        except Exception:
+            pass
+
         return {
             "success": True,
-            "detail": "API Key berhasil direfresh! Kunci lama telah tidak berlaku.",
+            "detail": "Nilai API Key berhasil dirotasi! Seluruh data layer dan workspace Anda tetap aman.",
             "api_key": plain_key,
             "full_key": plain_key,
             "masked_key": api_key.masked_key,
-            "is_active": api_key.is_active
+            "is_active": api_key.is_active,
+            "disk_usage": disk_usage
         }
     except HTTPException:
         raise

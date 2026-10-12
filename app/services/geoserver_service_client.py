@@ -61,8 +61,10 @@ class GeoServerServiceClient:
 
     def _headers(self, extra: Optional[Dict[str, str]] = None) -> Dict[str, str]:
         current_key = self.get_active_primary_key()
+        internal_secret = os.getenv("INTERNAL_SERVICE_SECRET", "voxagis_s2s_internal_secret_key_2026")
         headers = {
-            "X-API-Key": current_key
+            "X-API-Key": current_key,
+            "X-Internal-Secret": internal_secret
         }
         if extra:
             headers.update(extra)
@@ -325,6 +327,38 @@ class GeoServerServiceClient:
         except Exception as e:
             logger.error(f"Error toggling API key {key_id}: {e}")
             return False
+
+    def rotate_api_key(self, key_id: str) -> Dict[str, Any]:
+        """Merotasi rahasia kunci di microservice secara in-place (ID tetap sama)."""
+        res = requests.post(self._url(f"/api-keys/{key_id}/rotate"), headers=self._headers(), timeout=self.timeout)
+        if res.status_code == 200:
+            return res.json()
+        raise RuntimeError(f"Gagal merotasi API Key di microservice: {res.text}")
+
+    def update_key_quota(self, key_id: str, quota_mb: int) -> Dict[str, Any]:
+        """Mengubah batas kuota disk spasial (MB) di microservice."""
+        res = requests.patch(
+            self._url(f"/api-keys/{key_id}/quota"),
+            json={"quota_mb": quota_mb},
+            headers=self._headers(),
+            timeout=self.timeout
+        )
+        if res.status_code == 200:
+            return res.json()
+        raise RuntimeError(f"Gagal mengubah kuota API key di microservice: {res.text}")
+
+    def update_key_type(self, key_id: str, key_type: str) -> Dict[str, Any]:
+        """Mengubah tipe key (PRIMARY/STANDARD) di microservice saat role user berubah."""
+        res = requests.patch(
+            self._url(f"/api-keys/{key_id}/type"),
+            json={"key_type": key_type},
+            headers=self._headers(),
+            timeout=self.timeout
+        )
+        if res.status_code == 200:
+            return res.json()
+        raise RuntimeError(f"Gagal mengubah tipe API key di microservice: {res.text}")
+
 
     def get_audit_logs(
         self,

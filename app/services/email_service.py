@@ -4,12 +4,14 @@ import email.utils
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 
+APP_NAME = os.getenv("APP_NAME")
+
 def send_otp_email_sync(to_email: str, otp: str, purpose: str = "register"):
-    smtp_host = os.getenv("SMTP_HOST", "smtp.gmail.com")
-    smtp_port = int(os.getenv("SMTP_PORT", 587))
+    smtp_host = os.getenv("SMTP_HOST")
+    smtp_port = int(os.getenv("SMTP_PORT"))
     smtp_user = os.getenv("SMTP_USER")
     smtp_pass = os.getenv("SMTP_PASSWORD")
-    from_name = os.getenv("SMTP_FROM_NAME", "AstraGIS Platform")
+    from_name = os.getenv("SMTP_FROM_NAME")
     
     # Jika menggunakan Gmail SMTP, alamat pengirim WAJIB sama dengan akun SMTP yang diotentikasi
     # agar tidak dianggap spoofing / SPF failure oleh filter spam Gmail
@@ -40,7 +42,7 @@ Demi keamanan, JANGAN bagikan kode ini kepada siapa pun.
 Jika Anda tidak melakukan permintaan ini, silakan abaikan email ini.
 
 Salam,
-Tim AstraGIS Platform
+Tim {APP_NAME}
 """
 
     # 2. HTML Version (Layout tabel kompatibel semua client email: Gmail, Outlook, Apple Mail)
@@ -59,7 +61,7 @@ Tim AstraGIS Platform
           <!-- Header -->
           <tr>
             <td style="background-color: #0f172a; padding: 24px; text-align: center;">
-              <h1 style="margin: 0; color: #14b8a6; font-size: 24px; font-weight: 800; letter-spacing: 0.5px;">AstraGIS Platform</h1>
+              <h1 style="margin: 0; color: #14b8a6; font-size: 24px; font-weight: 800; letter-spacing: 0.5px;">{APP_NAME}</h1>
             </td>
           </tr>
           <!-- Body -->
@@ -89,7 +91,7 @@ Tim AstraGIS Platform
           <tr>
             <td style="background-color: #f8fafc; padding: 20px 24px; text-align: center; border-top: 1px solid #f1f5f9;">
               <p style="margin: 0; color: #94a3b8; font-size: 12px;">
-                Email ini dikirim secara otomatis oleh sistem AstraGIS. Harap tidak membalas email ini.
+                Email ini dikirim secara otomatis oleh sistem {APP_NAME}. Harap tidak membalas email ini.
               </p>
             </td>
           </tr>

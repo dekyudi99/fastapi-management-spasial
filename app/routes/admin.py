@@ -2,7 +2,7 @@ import json
 from fastapi import APIRouter, Depends, HTTPException, status, Query, Body
 from sqlalchemy.orm import Session
 from typing import List, Optional
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from config.database import get_db
 from models.users import Users
 from models.api_key import ApiKey
@@ -94,10 +94,21 @@ def update_user(
         user.username = payload.username
     if payload.email is not None:
         user.email = payload.email
-    if payload.role is not None:
+    if payload.role is not None and payload.role != user.role:
         if payload.role not in ("admin", "user"):
             raise HTTPException(status_code=400, detail="Role harus 'admin' atau 'user'.")
         user.role = payload.role
+        # Sinkronkan tipe API Key di GeoServer Microservice dan tabel lokal
+        user_key = db.query(ApiKey).filter(ApiKey.user_id == user.id).first()
+        if user_key:
+            new_key_type = "PRIMARY" if payload.role == "admin" else "STANDARD"
+            new_prefix = "gsvc_pk_" if payload.role == "admin" else "gsvc_sk_"
+            user_key.key_prefix = new_prefix
+            if user_key.microservice_key_id:
+                try:
+                    geoserver_service_client.update_key_type(user_key.microservice_key_id, new_key_type)
+                except Exception as e:
+                    print(f"[Role Sync Warning] Failed to sync key type in microservice: {e}")
     if payload.is_verified is not None:
         user.is_verified = payload.is_verified
 
@@ -193,25 +204,71 @@ def toggle_microservice_api_key(
     geoserver_service_client.toggle_api_key(key_id)
     return {"success": True, "detail": "Status API Key microservice berhasil diubah."}
 
-@router.post("/users/{user_id}/api-key/refresh")
+@router.post("/keys/{key_id}/rotate")
+def rotate_microservice_api_key(
+    key_id: str,
+    db: Session = Depends(get_db),
+    admin: Users = Depends(get_current_admin_user)
+):
+    """Merotasi nilai kunci di microservice dan database secara in-place (ID tetap sama)."""
+    res = geoserver_service_client.rotate_api_key(key_id)
+    plain_key = res.get("api_key")
+    masked = f"{plain_key[:10]}...{plain_key[-4:]}" if plain_key and len(plain_key) > 14 else plain_key
+
+    api_key = db.query(ApiKey).filter(ApiKey.microservice_key_id == key_id).first()
+    if api_key:
+        api_key.api_key_secret = plain_key
+        api_key.masked_key = masked
+        api_key.is_active = True
+        db.commit()
+        db.refresh(api_key)
+
+    return {
+        "success": True,
+        "detail": "Nilai API Key berhasil diperbarui! Seluruh data layer dan workspace tetap aman.",
+        "api_key": plain_key,
+        "full_key": plain_key,
+        "masked_key": masked,
+        "is_active": True
+    }
+
+class KeyQuotaRequest(BaseModel):
+    quota_mb: int = Field(..., ge=1, le=102400)
+
+@router.patch("/keys/{key_id}/quota")
+def update_key_quota_proxy(
+    key_id: str,
+    payload: KeyQuotaRequest,
+    db: Session = Depends(get_db),
+    admin: Users = Depends(get_current_admin_user)
+):
+    """Admin proxy untuk mengubah kuota disk spasial API Key tertentu di GeoServer Microservice."""
+    try:
+        res = geoserver_service_client.update_key_quota(key_id, payload.quota_mb)
+        return res
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 @router.post("/users/{user_id}/api-key/generate")
-def refresh_user_api_key(
+def generate_user_api_key(
     user_id: int,
     db: Session = Depends(get_db),
     admin: Users = Depends(get_current_admin_user)
 ):
+    """
+    Menerbitkan API Key baru untuk user yang BELUM memiliki API Key sama sekali.
+    Aturan Ketat: 1 User wajib tepat 1 API Key. Tolak jika sudah memiliki kunci.
+    """
     user = db.query(Users).filter(Users.id == user_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="User tidak ditemukan.")
 
     api_key = db.query(ApiKey).filter(ApiKey.user_id == user_id).first()
-    is_new_creation = (api_key is None)
-
     if api_key and api_key.microservice_key_id:
-        try:
-            geoserver_service_client.deactivate_api_key(api_key.microservice_key_id)
-        except Exception:
-            pass
+        raise HTTPException(
+            status_code=400,
+            detail=f"Pengguna '{user.username}' sudah memiliki API Key. Setiap user hanya boleh memiliki 1 API Key. Gunakan opsi 'Perbarui' jika ingin mengganti/merotasi token."
+        )
 
     is_admin_user = (getattr(user, 'role', 'user') == 'admin')
     key_type = "PRIMARY" if is_admin_user else "STANDARD"
@@ -225,11 +282,15 @@ def refresh_user_api_key(
         "generated_by_admin": admin.username
     })
 
-    res = geoserver_service_client.create_api_key(
-        name=f"Key - {user.username}",
-        key_type=key_type,
-        owner_info=owner_info
-    )
+    try:
+        res = geoserver_service_client.create_api_key(
+            name=f"Key - {user.username}",
+            key_type=key_type,
+            owner_info=owner_info
+        )
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Gagal menerbitkan API Key di Microservice: {e}")
+
     plain_key = res.get("api_key")
     key_id = res.get("id")
     masked = f"{plain_key[:10]}...{plain_key[-4:]}" if plain_key and len(plain_key) > 14 else plain_key
@@ -255,20 +316,50 @@ def refresh_user_api_key(
     db.commit()
     db.refresh(api_key)
 
-    detail_msg = (
-        f"API Key baru berhasil dibuatkan untuk {user.username}!"
-        if is_new_creation else
-        f"API Key untuk {user.username} berhasil direfresh!"
-    )
+    return {
+        "success": True,
+        "detail": f"API Key baru berhasil diterbitkan untuk {user.username}!",
+        "api_key": plain_key,
+        "full_key": plain_key,
+        "masked_key": masked,
+        "is_active": True,
+        "username": user.username
+    }
+
+@router.post("/users/{user_id}/api-key/refresh")
+def refresh_user_api_key(
+    user_id: int,
+    db: Session = Depends(get_db),
+    admin: Users = Depends(get_current_admin_user)
+):
+    user = db.query(Users).filter(Users.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User tidak ditemukan.")
+
+    api_key = db.query(ApiKey).filter(ApiKey.user_id == user_id).first()
+    if not api_key or not api_key.microservice_key_id:
+        raise HTTPException(status_code=400, detail="Pengguna belum memiliki API Key. Silakan terbitkan kunci terlebih dahulu.")
+
+    res = geoserver_service_client.rotate_api_key(api_key.microservice_key_id)
+    plain_key = res.get("api_key")
+    masked = f"{plain_key[:10]}...{plain_key[-4:]}" if plain_key and len(plain_key) > 14 else plain_key
+
+    api_key.api_key_secret = plain_key
+    api_key.masked_key = masked
+    api_key.is_active = True
+    db.commit()
+    db.refresh(api_key)
 
     return {
         "success": True,
-        "detail": detail_msg,
+        "detail": f"API Key untuk {user.username} berhasil direfresh! Seluruh data spasial tetap utuh.",
         "api_key": plain_key,
         "full_key": plain_key,
-        "masked_key": api_key.masked_key,
-        "is_active": api_key.is_active
+        "masked_key": masked,
+        "is_active": True,
+        "username": user.username
     }
+
 
 # ==========================================================
 # 3. AUDIT LOGS & GEOSERVER SYSTEM PROXY
@@ -307,6 +398,10 @@ def get_geoserver_overview(
     user_by_id = {u.id: u for u in users_list}
     user_by_username = {u.username.lower(): u for u in users_list}
 
+    api_keys_db = db.query(ApiKey).all()
+    key_by_microservice_id = {ak.microservice_key_id: ak for ak in api_keys_db if ak.microservice_key_id}
+    user_ids_with_key = {ak.user_id for ak in api_keys_db if ak.user_id}
+
     enriched_keys = []
     for k in keys:
         if k.get("name") == "astragis-core":
@@ -343,10 +438,28 @@ def get_geoserver_overview(
                 k["key_type"] = "STANDARD"
                 k["key_prefix"] = "gsvc_sk_"
 
+        # Sinkronkan full secret & masked key dari tabel ApiKey jika ada
+        ak_db = key_by_microservice_id.get(k.get("id"))
+        if ak_db:
+            k["full_key"] = ak_db.api_key_secret
+            k["masked_key"] = ak_db.masked_key
+            k["user_id"] = ak_db.user_id
+        else:
+            k["masked_key"] = f"{k.get('key_prefix', 'gsvc_')}••••••••"
+            k["full_key"] = None
+
         enriched_keys.append(k)
+
+    users_without_key = [
+        {"id": u.id, "username": u.username, "email": u.email, "role": u.role}
+        for u in users_list
+        if u.id not in user_ids_with_key
+    ]
 
     return {
         "status": status_info,
         "workspaces": workspaces,
-        "registered_api_keys": enriched_keys
+        "registered_api_keys": enriched_keys,
+        "users_without_key": users_without_key
     }
+

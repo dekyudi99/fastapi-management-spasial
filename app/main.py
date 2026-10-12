@@ -32,10 +32,15 @@ try:
 except Exception as e:
     print(f"[DB Auto-Migration] {e}")
 
+enable_docs = os.getenv("ENABLE_DOCS", "false").lower() in ("true", "1", "yes")
+
 app = FastAPI(
     title="AstraGIS Core Management API",
     description="Layanan inti AstraGIS: Manajemen Pengguna dan API Key untuk GeoServer Microservice",
-    version="2.0.0"
+    version="2.0.0",
+    docs_url="/docs" if enable_docs else None,
+    redoc_url="/redoc" if enable_docs else None,
+    openapi_url="/openapi.json" if enable_docs else None
 )
 
 default_origins = [

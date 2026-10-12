@@ -44,6 +44,7 @@ def register(
             username=username,
             email=email,
             password=hash_password(password),
+            role="user",
             is_verified=False
         )
         try:
