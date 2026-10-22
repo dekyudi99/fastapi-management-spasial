@@ -9,7 +9,10 @@ load_dotenv()
 
 from config.database import Base, engine
 from sqlalchemy import text
-from models import email_otp, users, api_key as api_key_model
+from models.users import Users
+from models.email_otp import EmailOTP
+from models.api_key import ApiKey
+from models.logs import Logs
 
 # Pastikan migrasi kolom penting tersedia di PostgreSQL
 try:
@@ -17,11 +20,11 @@ try:
     with engine.begin() as conn:
         conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS is_verified BOOLEAN DEFAULT FALSE;"))
         conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS role VARCHAR(20) DEFAULT 'user';"))
-        conn.execute(text("ALTER TABLE api_keys ADD COLUMN IF NOT EXISTS user_id BIGINT;"))
-        conn.execute(text("ALTER TABLE api_keys ADD COLUMN IF NOT EXISTS microservice_key_id VARCHAR(100);"))
-        conn.execute(text("ALTER TABLE api_keys ADD COLUMN IF NOT EXISTS key_prefix VARCHAR(20) DEFAULT 'gsvc_sk_';"))
-        conn.execute(text("ALTER TABLE api_keys ADD COLUMN IF NOT EXISTS masked_key VARCHAR(50);"))
-        conn.execute(text("ALTER TABLE api_keys ADD COLUMN IF NOT EXISTS api_key_secret VARCHAR(255);"))
+        conn.execute(text("ALTER TABLE user_api_keys ADD COLUMN IF NOT EXISTS user_id BIGINT;"))
+        conn.execute(text("ALTER TABLE user_api_keys ADD COLUMN IF NOT EXISTS microservice_key_id VARCHAR(100);"))
+        conn.execute(text("ALTER TABLE user_api_keys ADD COLUMN IF NOT EXISTS key_prefix VARCHAR(20) DEFAULT 'gsvc_sk_';"))
+        conn.execute(text("ALTER TABLE user_api_keys ADD COLUMN IF NOT EXISTS masked_key VARCHAR(50);"))
+        conn.execute(text("ALTER TABLE user_api_keys ADD COLUMN IF NOT EXISTS api_key_secret VARCHAR(255);"))
         
         # Buat user admin default jika belum ada admin sama sekali
         has_admin = conn.execute(text("SELECT COUNT(*) FROM users WHERE role = 'admin';")).scalar()

@@ -4,9 +4,9 @@ from sqlalchemy.sql import func
 from services.timesatampz_service import TimestampMixin
 
 class ApiKey(TimestampMixin, Base):
-    __tablename__ = "api_keys"
+    __tablename__ = "user_api_keys"
 
-    id = Column(Integer, primary_key=True)
+    id = Column(Integer, primary_key=True, autoincrement=True)
 
     user_id = Column(
         BigInteger,

@@ -20,12 +20,11 @@ class Logs(TimestampMixin, Base):
     # Aktor API Key & Project (jika aksi dilakukan via API Key S2S)
     api_key_id = Column(
         Integer,
-        ForeignKey("api_keys.id", ondelete="SET NULL"),
+        ForeignKey("user_api_keys.id", ondelete="SET NULL"),
         nullable=True
     )
     project_id = Column(
         Integer,
-        ForeignKey("projects.id", ondelete="SET NULL"),
         nullable=True
     )
 
