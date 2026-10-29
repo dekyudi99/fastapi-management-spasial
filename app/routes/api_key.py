@@ -82,7 +82,8 @@ def refresh_my_api_key(
                 pass
 
         if not plain_key:
-            is_admin = getattr(current_user, 'role', 'user') == 'admin'
+            token_roles = getattr(current_user, 'token_roles', [getattr(current_user, 'role', 'user')])
+            is_admin = 'admin' in token_roles
             key_type = "PRIMARY" if is_admin else "STANDARD"
             prefix = "gsvc_pk_" if is_admin else "gsvc_sk_"
 

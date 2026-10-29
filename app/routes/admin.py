@@ -6,17 +6,16 @@ from pydantic import BaseModel, Field
 from config.database import get_db
 from models.users import Users
 from models.api_key import ApiKey
-from services.auth_service import get_current_user
+from services.auth_service import get_current_user, require_role
 from services.geoserver_service_client import geoserver_service_client
 
 router = APIRouter(prefix="/admin", tags=["Admin Management"])
 
-def get_current_admin_user(current_user: Users = Depends(get_current_user)) -> Users:
-    if current_user.role != "admin":
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Akses ditolak: Operasi ini membutuhkan hak akses Administrator."
-        )
+def get_current_admin_user(
+    current_user: Users = Depends(get_current_user),
+    _: dict = Depends(require_role("admin"))
+) -> Users:
+    """Dependency otorisasi admin pusat berbasis klaim role token Keycloak"""
     return current_user
 
 class UserUpdateRequest(BaseModel):

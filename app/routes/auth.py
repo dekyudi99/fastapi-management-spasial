@@ -1,19 +1,38 @@
+import os
+import random
+from datetime import datetime, timedelta
 from fastapi import APIRouter, Form, Depends, HTTPException, status, BackgroundTasks
-from fastapi.responses import JSONResponse
-from config.database import get_db
+from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
+
+from config.database import get_db
 from models.users import Users
+from models.email_otp import EmailOTP
 from services.password_service import hash_password, verify_password
 from services.jwt_service import create_access_token
 from services.auth_service import get_current_user
-from fastapi.security import OAuth2PasswordRequestForm
-import random
-from datetime import datetime, timedelta
-from models.email_otp import EmailOTP
 from services.email_service import send_otp_email_sync
 from services.api_key_service import ensure_user_api_key
 
 router = APIRouter(prefix="/auth", tags=["Auth"])
+
+# Flag env AUTH_LOCAL_ENABLED (default: False)
+AUTH_LOCAL_ENABLED = os.getenv(
+    "AUTH_LOCAL_ENABLED",
+    os.getenv("LEGACY_AUTH_ENABLED", "false")
+).strip().lower() in ("true", "1", "yes")
+
+
+def require_local_auth():
+    """Memastikan alur autentikasi lokal hanya dapat diakses jika AUTH_LOCAL_ENABLED aktif"""
+    if not AUTH_LOCAL_ENABLED:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Autentikasi lokal dinonaktifkan. Silakan gunakan Single Sign-On (Keycloak SSO).",
+        )
+
+
+# ── PENDAFTARAN & LOGIN LOKAL (DILINDUNGI FLAG AUTH_LOCAL_ENABLED) ─────────────
 
 @router.post("/register", status_code=status.HTTP_201_CREATED)
 def register(
@@ -22,7 +41,9 @@ def register(
     password: str = Form(...),
     background_tasks: BackgroundTasks = None,
     db: Session = Depends(get_db)
-):  
+):
+    require_local_auth()
+
     if len(password) < 8:
         raise HTTPException(status_code=400, detail="Password must be at least 8 characters long.")
 
@@ -50,11 +71,12 @@ def register(
         try:
             db.add(user)
             db.commit()
+            db.refresh(user)
+            ensure_user_api_key(user, db)
         except Exception as e:
             db.rollback()
-            raise HTTPException(status_code=500, detail=f"Failed to save data: {e}")
+            raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
 
-    # Kirimkan OTP verifikasi pertama kali
     otp = str(random.randint(100000, 999999))
     expires = datetime.utcnow() + timedelta(minutes=5)
 
@@ -70,86 +92,58 @@ def register(
 
     return {
         "success": True,
-        "requires_verification": True,
-        "email": email,
-        "username": username,
-        "detail": "Registration successful! A verification OTP has been sent to your email."
+        "detail": "Account registered. Verification OTP code has been sent to your email."
     }
-    
+
+
 @router.post("/login")
 def login(
-    formdata: OAuth2PasswordRequestForm = Depends(),
-    background_tasks: BackgroundTasks = None,
+    form_data: OAuth2PasswordRequestForm = Depends(),
     db: Session = Depends(get_db)
 ):
-    username = formdata.username
-    password = formdata.password
+    require_local_auth()
 
-    try:
-        user = db.query(Users).filter(Users.username == username).first()
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-    
+    login_identifier = form_data.username.strip()
+    user = db.query(Users).filter(
+        (Users.username == login_identifier) | (Users.email == login_identifier.lower())
+    ).first()
+
     if not user:
-        raise HTTPException(status_code=404, detail="Incorrect username or password.")
-        
-    valid = verify_password(password, user.password)
-    if not valid:
-        raise HTTPException(status_code=401, detail="Incorrect username or password.")
-
-    # Jika akun belum diverifikasi: Kirim OTP baru secara otomatis & arahkan frontend ke verifikasi
-    if not user.is_verified:
-        otp = str(random.randint(100000, 999999))
-        expires = datetime.utcnow() + timedelta(minutes=5)
-
-        db.query(EmailOTP).filter(EmailOTP.email == user.email, EmailOTP.type == "register").delete()
-        new_otp = EmailOTP(email=user.email, otp=otp, type="register", expires_at=expires)
-        db.add(new_otp)
-        db.commit()
-
-        if background_tasks:
-            background_tasks.add_task(send_otp_email_sync, user.email, otp, "register")
-        else:
-            send_otp_email_sync(user.email, otp, "register")
-
-        return JSONResponse(
-            status_code=status.HTTP_403_FORBIDDEN,
-            content={
-                "success": False,
-                "requires_verification": True,
-                "email": user.email,
-                "username": user.username,
-                "detail": "Your account is not verified yet. A new verification OTP has been sent to your email. Please verify to continue."
-            }
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Incorrect username/email or password.",
+            headers={"WWW-Authenticate": "Bearer"},
         )
-    
+
+    if not verify_password(form_data.password, user.password):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Incorrect username/email or password.",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    if not user.is_verified:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Your email has not been verified. Please verify your account first."
+        )
+
     payload = {
         "sub": user.username,
         "email": user.email,
         "role": user.role
     }
-    
-    access_token = create_access_token(data=payload)
+    token = create_access_token(data=payload)
 
-    s2s_key = None
-    is_key_active = True
-    try:
-        k = ensure_user_api_key(user, db)
-        if k:
-            is_key_active = bool(k.is_active)
-            if k.is_active:
-                s2s_key = k.plain_key
-    except Exception:
-        pass
-    
     return {
-        "success": True,
-        "detail": f"Welcome {user.username}",
-        "access_token": access_token,
-        "type": "bearer",
-        "s2s_key": s2s_key,
-        "is_active": is_key_active
+        "access_token": token,
+        "token_type": "bearer",
+        "role": user.role,
+        "username": user.username,
+        "email": user.email,
+        "is_verified": user.is_verified
     }
+
 
 @router.post("/send-register-otp")
 def send_register_otp(
@@ -157,255 +151,18 @@ def send_register_otp(
     background_tasks: BackgroundTasks = None,
     db: Session = Depends(get_db)
 ):
-    # Cek apakah email sudah terdaftar dan sudah diverifikasi
-    existing_user = db.query(Users).filter(Users.email == email).first()
+    require_local_auth()
+
+    clean_email = email.strip().lower()
+    existing_user = db.query(Users).filter(Users.email == clean_email).first()
     if existing_user and existing_user.is_verified:
-        raise HTTPException(status_code=400, detail="Email is already registered. Please use another email or log in.")
-    # Generate 6 Digit OTP
-    otp = str(random.randint(100000, 999999))
-    expires = datetime.utcnow() + timedelta(minutes=5)
-    # Hapus OTP lama dan simpan yang baru
-    db.query(EmailOTP).filter(EmailOTP.email == email, EmailOTP.type == "register").delete()
-    new_otp = EmailOTP(email=email, otp=otp, type="register", expires_at=expires)
-    db.add(new_otp)
-    db.commit()
-    # Kirim email di background agar user tidak menunggu lama
-    if background_tasks:
-        background_tasks.add_task(send_otp_email_sync, email, otp, "register")
-    else:
-        send_otp_email_sync(email, otp, "register")
-    return {"success": True, "detail": "OTP code has been sent to your email."}
-
-@router.post("/verify-and-register", status_code=status.HTTP_201_CREATED)
-def verify_and_register(
-    username: str = Form(...),
-    email: str = Form(...),
-    password: str = Form(...),
-    otp: str = Form(...),
-    db: Session = Depends(get_db)
-):
-    if len(password) < 8:
-        raise HTTPException(status_code=400, detail="Password must be at least 8 characters long.")
-    # Validasi OTP
-    record = db.query(EmailOTP).filter(
-        EmailOTP.email == email,
-        EmailOTP.otp == otp,
-        EmailOTP.type == "register",
-        EmailOTP.expires_at > datetime.utcnow()
-    ).first()
-    if not record:
-        raise HTTPException(status_code=400, detail="Invalid or expired OTP code.")
-
-    existing_user = db.query(Users).filter(Users.email == email).first()
-    if existing_user:
-        existing_user.username = username
-        existing_user.password = hash_password(password)
-        existing_user.is_verified = True
-    else:
-        new_user = Users(
-            username=username,
-            email=email,
-            password=hash_password(password),
-            is_verified=True
-        )
-        db.add(new_user)
-
-    db.delete(record)  # Hapus OTP sekali pakai
-    db.commit()
-    return {"success": True, "detail": "Registration and email verification successful!"}
-
-@router.post("/verify-email")
-def verify_email(
-    email: str = Form(...),
-    otp: str = Form(...),
-    db: Session = Depends(get_db)
-):
-    record = db.query(EmailOTP).filter(
-        EmailOTP.email == email,
-        EmailOTP.otp == otp,
-        EmailOTP.type == "register",
-        EmailOTP.expires_at > datetime.utcnow()
-    ).first()
-
-    if not record:
-        raise HTTPException(status_code=400, detail="Invalid or expired OTP code.")
-
-    user = db.query(Users).filter(Users.email == email).first()
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found.")
-
-    user.is_verified = True
-    db.delete(record)
-    db.commit()
-
-    # Langsung berikan token agar user otomatis login setelah verifikasi OTP
-    payload = {
-        "sub": user.username,
-        "email": user.email,
-        "role": user.role
-    }
-    access_token = create_access_token(data=payload)
-
-    s2s_key = None
-    is_key_active = True
-    try:
-        k = ensure_user_api_key(user, db)
-        if k:
-            is_key_active = bool(k.is_active)
-            if k.is_active:
-                s2s_key = k.plain_key
-    except Exception:
-        pass
-
-    return {
-        "success": True,
-        "detail": "Email verified successfully! You are now logged in.",
-        "access_token": access_token,
-        "type": "bearer",
-        "s2s_key": s2s_key,
-        "user": {
-            "id": user.id,
-            "username": user.username,
-            "email": user.email,
-            "role": user.role,
-            "s2s_key": s2s_key
-        }
-    }
-
-@router.post("/forgot-password/send-otp")
-def send_forgot_password_otp(
-    email: str = Form(...),
-    background_tasks: BackgroundTasks = None,
-    db: Session = Depends(get_db)
-):
-    user = db.query(Users).filter(Users.email == email).first()
-    if not user:
-        raise HTTPException(status_code=404, detail="Email is not registered in our system.")
-    otp = str(random.randint(100000, 999999))
-    expires = datetime.utcnow() + timedelta(minutes=5)
-    db.query(EmailOTP).filter(EmailOTP.email == email, EmailOTP.type == "reset_password").delete()
-    new_otp = EmailOTP(email=email, otp=otp, type="reset_password", expires_at=expires)
-    db.add(new_otp)
-    db.commit()
-    if background_tasks:
-        background_tasks.add_task(send_otp_email_sync, email, otp, "reset_password")
-    else:
-        send_otp_email_sync(email, otp, "reset_password")
-    return {"success": True, "detail": "Password reset OTP code has been sent to your email."}
-
-@router.post("/forgot-password/reset")
-def reset_password(
-    email: str = Form(...),
-    otp: str = Form(...),
-    new_password: str = Form(...),
-    db: Session = Depends(get_db)
-):
-    if len(new_password) < 8:
-        raise HTTPException(status_code=400, detail="New password must be at least 8 characters long.")
-    record = db.query(EmailOTP).filter(
-        EmailOTP.email == email,
-        EmailOTP.otp == otp,
-        EmailOTP.type == "reset_password",
-        EmailOTP.expires_at > datetime.utcnow()
-    ).first()
-    if not record:
-        raise HTTPException(status_code=400, detail="Invalid or expired OTP code.")
-    user = db.query(Users).filter(Users.email == email).first()
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found.")
-    user.password = hash_password(new_password)
-    db.delete(record)
-    db.commit()
-    return {"success": True, "detail": "Password updated successfully. Please log in again."}
-
-
-# ── PROFILE & ACCOUNT MANAGEMENT ──────────────────────────────────────────────
-
-@router.get("/me")
-def get_my_profile(
-    current_user: Users = Depends(get_current_user)
-):
-    """Mengambil informasi profil akun pengguna saat ini"""
-    created_at_val = current_user.created_at.isoformat() if current_user.created_at else None
-    return {
-        "success": True,
-        "data": {
-            "id": current_user.id,
-            "username": current_user.username,
-            "email": current_user.email,
-            "role": current_user.role,
-            "is_verified": current_user.is_verified,
-            "created_at": created_at_val
-        }
-    }
-
-
-@router.put("/profile")
-def update_profile(
-    username: str = Form(...),
-    current_user: Users = Depends(get_current_user),
-    db: Session = Depends(get_db)
-):
-    """Memperbarui username pengguna"""
-    clean_username = username.strip()
-    if not clean_username:
-        raise HTTPException(status_code=400, detail="Username cannot be empty.")
-
-    # Cek apakah username sudah dipakai pengguna lain
-    existing = db.query(Users).filter(Users.username == clean_username, Users.id != current_user.id).first()
-    if existing:
-        raise HTTPException(status_code=400, detail="Username is already taken by another account.")
-
-    current_user.username = clean_username
-    db.commit()
-    db.refresh(current_user)
-
-    # Perbarui access token dengan username baru
-    payload = {
-        "sub": current_user.username,
-        "email": current_user.email,
-        "role": current_user.role
-    }
-    new_token = create_access_token(data=payload)
-
-    created_at_val = current_user.created_at.isoformat() if current_user.created_at else None
-
-    return {
-        "success": True,
-        "detail": "Username updated successfully!",
-        "access_token": new_token,
-        "data": {
-            "id": current_user.id,
-            "username": current_user.username,
-            "email": current_user.email,
-            "role": current_user.role,
-            "is_verified": current_user.is_verified,
-            "created_at": created_at_val
-        }
-    }
-
-
-@router.post("/change-email/send-otp")
-def send_change_email_otp(
-    new_email: str = Form(...),
-    background_tasks: BackgroundTasks = None,
-    current_user: Users = Depends(get_current_user),
-    db: Session = Depends(get_db)
-):
-    """Mengirim kode OTP ke alamat email baru untuk memverifikasi pergantian email"""
-    clean_email = new_email.strip().lower()
-    if clean_email == current_user.email.lower():
-        raise HTTPException(status_code=400, detail="New email cannot be the same as your current email.")
-
-    # Cek apakah email sudah terdaftar di akun lain
-    if db.query(Users).filter(Users.email == clean_email, Users.id != current_user.id).first():
-        raise HTTPException(status_code=400, detail="This email address is already in use by another account.")
+        raise HTTPException(status_code=400, detail="This email is already registered and verified. Please log in directly.")
 
     otp = str(random.randint(100000, 999999))
     expires = datetime.utcnow() + timedelta(minutes=5)
 
-    db.query(EmailOTP).filter(EmailOTP.email == clean_email, EmailOTP.type == "change_email").delete()
-    new_otp = EmailOTP(email=clean_email, otp=otp, type="change_email", expires_at=expires)
+    db.query(EmailOTP).filter(EmailOTP.email == clean_email, EmailOTP.type == "register").delete()
+    new_otp = EmailOTP(email=clean_email, otp=otp, type="register", expires_at=expires)
     db.add(new_otp)
     db.commit()
 
@@ -416,93 +173,183 @@ def send_change_email_otp(
 
     return {
         "success": True,
-        "detail": f"Verification OTP code has been sent to your new email ({clean_email})."
+        "detail": f"Registration OTP has been sent to {clean_email}."
     }
 
 
-@router.post("/change-email/verify")
-def verify_change_email(
-    new_email: str = Form(...),
+@router.post("/verify-and-register", status_code=status.HTTP_201_CREATED)
+def verify_and_register(
+    email: str = Form(...),
     otp: str = Form(...),
-    current_user: Users = Depends(get_current_user),
+    username: str = Form(...),
+    password: str = Form(...),
     db: Session = Depends(get_db)
 ):
-    """Verifikasi kode OTP dan resmi mengganti email pengguna"""
-    clean_email = new_email.strip().lower()
+    require_local_auth()
+
+    clean_email = email.strip().lower()
+    clean_username = username.strip()
+
+    if len(password) < 8:
+        raise HTTPException(status_code=400, detail="Password must be at least 8 characters long.")
 
     record = db.query(EmailOTP).filter(
         EmailOTP.email == clean_email,
         EmailOTP.otp == otp,
-        EmailOTP.type == "change_email",
+        EmailOTP.type == "register",
         EmailOTP.expires_at > datetime.utcnow()
     ).first()
 
     if not record:
         raise HTTPException(status_code=400, detail="Invalid or expired OTP code.")
 
-    current_user.email = clean_email
-    current_user.is_verified = True
+    existing_email = db.query(Users).filter(Users.email == clean_email).first()
+    if existing_email and existing_email.is_verified:
+        raise HTTPException(status_code=400, detail="Email is already registered. Please log in.")
+
+    existing_username = db.query(Users).filter(Users.username == clean_username).first()
+    if existing_username:
+        if not existing_email or existing_username.id != existing_email.id:
+            raise HTTPException(status_code=400, detail="Username is already taken. Please choose another username.")
+
+    if existing_email:
+        existing_email.username = clean_username
+        existing_email.password = hash_password(password)
+        existing_email.is_verified = True
+        user = existing_email
+    else:
+        user = Users(
+            username=clean_username,
+            email=clean_email,
+            password=hash_password(password),
+            role="user",
+            is_verified=True
+        )
+        db.add(user)
+
     db.delete(record)
     db.commit()
-    db.refresh(current_user)
+    db.refresh(user)
 
-    # Perbarui access token dengan email baru
-    payload = {
-        "sub": current_user.username,
-        "email": current_user.email,
-        "role": current_user.role
-    }
-    new_token = create_access_token(data=payload)
+    ensure_user_api_key(user, db)
 
-    created_at_val = current_user.created_at.isoformat() if current_user.created_at else None
+    payload = {"sub": user.username, "email": user.email, "role": user.role}
+    token = create_access_token(data=payload)
 
     return {
         "success": True,
-        "detail": "Email address updated and verified successfully!",
-        "access_token": new_token,
-        "data": {
-            "id": current_user.id,
-            "username": current_user.username,
-            "email": current_user.email,
-            "role": current_user.role,
-            "is_verified": current_user.is_verified,
-            "created_at": created_at_val
-        }
+        "detail": "Account registered and email verified successfully!",
+        "access_token": token,
+        "token_type": "bearer",
+        "username": user.username,
+        "email": user.email,
+        "role": user.role
     }
 
 
-@router.post("/change-password")
-def change_password(
-    old_password: str = Form(...),
-    new_password: str = Form(...),
-    current_user: Users = Depends(get_current_user),
+@router.post("/verify-email")
+def verify_email(
+    email: str = Form(...),
+    otp: str = Form(...),
     db: Session = Depends(get_db)
 ):
-    """Mengubah kata sandi akun dengan memvalidasi kata sandi lama terlebih dahulu"""
-    if not verify_password(old_password, current_user.password):
-        raise HTTPException(status_code=400, detail="Incorrect current password.")
+    require_local_auth()
+
+    clean_email = email.strip().lower()
+    record = db.query(EmailOTP).filter(
+        EmailOTP.email == clean_email,
+        EmailOTP.otp == otp,
+        EmailOTP.type == "register",
+        EmailOTP.expires_at > datetime.utcnow()
+    ).first()
+
+    if not record:
+        raise HTTPException(status_code=400, detail="Invalid or expired OTP code.")
+
+    user = db.query(Users).filter(Users.email == clean_email).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User account not found.")
+
+    user.is_verified = True
+    db.delete(record)
+    db.commit()
+
+    return {"success": True, "detail": "Email verified successfully. You can now log in."}
+
+
+@router.post("/forgot-password/send-otp")
+def forgot_password_send_otp(
+    email: str = Form(...),
+    background_tasks: BackgroundTasks = None,
+    db: Session = Depends(get_db)
+):
+    require_local_auth()
+
+    user = db.query(Users).filter(Users.email == email).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="Email is not registered.")
+
+    otp = str(random.randint(100000, 999999))
+    expires = datetime.utcnow() + timedelta(minutes=5)
+
+    db.query(EmailOTP).filter(EmailOTP.email == email, EmailOTP.type == "reset_password").delete()
+    new_otp = EmailOTP(email=email, otp=otp, type="reset_password", expires_at=expires)
+    db.add(new_otp)
+    db.commit()
+
+    if background_tasks:
+        background_tasks.add_task(send_otp_email_sync, email, otp, "reset_password")
+    else:
+        send_otp_email_sync(email, otp, "reset_password")
+
+    return {"success": True, "detail": "Password reset OTP code has been sent to your email."}
+
+
+@router.post("/forgot-password/reset")
+def reset_password(
+    email: str = Form(...),
+    otp: str = Form(...),
+    new_password: str = Form(...),
+    db: Session = Depends(get_db)
+):
+    require_local_auth()
 
     if len(new_password) < 8:
         raise HTTPException(status_code=400, detail="New password must be at least 8 characters long.")
 
-    if old_password == new_password:
-        raise HTTPException(status_code=400, detail="New password cannot be the same as the old password.")
+    record = db.query(EmailOTP).filter(
+        EmailOTP.email == email,
+        EmailOTP.otp == otp,
+        EmailOTP.type == "reset_password",
+        EmailOTP.expires_at > datetime.utcnow()
+    ).first()
 
-    current_user.password = hash_password(new_password)
+    if not record:
+        raise HTTPException(status_code=400, detail="Invalid or expired OTP code.")
+
+    user = db.query(Users).filter(Users.email == email).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found.")
+
+    user.password = hash_password(new_password)
+    db.delete(record)
     db.commit()
 
-    return {
-        "success": True,
-        "detail": "Your password has been updated successfully!"
-    }
+    return {"success": True, "detail": "Password updated successfully. Please log in again."}
 
+
+# ── PROFILE & SESSION DATA ───────────────────────────────────────────────────
 
 @router.get("/me")
 def get_me(
     current_user: Users = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Mengambil profil lengkap pengguna termasuk S2S API Key untuk koneksi GeoServer Microservice"""
+    """
+    Mengambil profil pengguna saat ini.
+    Mendukung token Keycloak SSO dan legacy token.
+    """
+    token_roles = getattr(current_user, "token_roles", [current_user.role or "user"])
     api_key_record = ensure_user_api_key(current_user, db)
     s2s_key = api_key_record.api_key_secret if api_key_record else None
 
@@ -510,12 +357,14 @@ def get_me(
         "success": True,
         "data": {
             "id": current_user.id,
+            "keycloak_sub": current_user.keycloak_sub,
             "username": current_user.username,
             "email": current_user.email,
             "role": current_user.role,
+            "roles": token_roles,
             "is_verified": current_user.is_verified,
             "s2s_key": s2s_key,
             "masked_key": api_key_record.masked_key if api_key_record else None,
-            "created_at": current_user.created_at.isoformat() if current_user.created_at else None
+            "created_at": current_user.created_at.isoformat() if current_user.created_at else None,
         }
     }

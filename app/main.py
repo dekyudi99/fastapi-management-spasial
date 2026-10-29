@@ -20,6 +20,8 @@ try:
     with engine.begin() as conn:
         conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS is_verified BOOLEAN DEFAULT FALSE;"))
         conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS role VARCHAR(20) DEFAULT 'user';"))
+        conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS keycloak_sub VARCHAR(255) UNIQUE;"))
+        conn.execute(text("ALTER TABLE users ALTER COLUMN password DROP NOT NULL;"))
         conn.execute(text("ALTER TABLE user_api_keys ADD COLUMN IF NOT EXISTS user_id BIGINT;"))
         conn.execute(text("ALTER TABLE user_api_keys ADD COLUMN IF NOT EXISTS microservice_key_id VARCHAR(100);"))
         conn.execute(text("ALTER TABLE user_api_keys ADD COLUMN IF NOT EXISTS key_prefix VARCHAR(20) DEFAULT 'gsvc_sk_';"))
