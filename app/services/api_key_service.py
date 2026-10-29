@@ -19,6 +19,7 @@ def ensure_user_api_key(user: Users, db: Session) -> ApiKey:
     """
     Memastikan user memiliki 1 API Key aktif lengkap dengan secret key.
     Admin mendapatkan PRIMARY key (gsvc_pk_), sedangkan user biasa mendapatkan STANDARD key (gsvc_sk_).
+    Mendukung rekonsiliasi in-place rotation jika key sudah terdaftar di GeoServer Microservice.
     """
     api_key = db.query(ApiKey).filter(ApiKey.user_id == user.id).first()
 
@@ -34,37 +35,73 @@ def ensure_user_api_key(user: Users, db: Session) -> ApiKey:
                 "email": user.email,
                 "role": user.role
             })
-            res = geoserver_service_client.create_api_key(
-                name=f"Key - {user.username}",
-                key_type=key_type,
-                owner_info=owner_info
-            )
-            plain_key = res.get("api_key")
-            key_id = res.get("id")
 
-            if not api_key:
-                api_key = ApiKey(
-                    user_id=user.id,
+            plain_key = None
+            key_id = None
+
+            # 1. Jika api_key lokal sudah ada microservice_key_id, rotasi langsung
+            if api_key and api_key.microservice_key_id:
+                try:
+                    res = geoserver_service_client.rotate_api_key(api_key.microservice_key_id)
+                    plain_key = res.get("api_key")
+                    key_id = res.get("id")
+                except Exception:
+                    pass
+
+            # 2. Jika belum dapat plain_key, periksa apakah microservice sudah punya key untuk user ini
+            if not plain_key:
+                try:
+                    existing_keys = geoserver_service_client.list_api_keys()
+                    for k in existing_keys:
+                        k_owner = k.get("owner_info")
+                        if k_owner:
+                            try:
+                                owner_obj = json.loads(k_owner) if isinstance(k_owner, str) else k_owner
+                                if str(owner_obj.get("user_id")) == str(user.id) or owner_obj.get("username") == user.username:
+                                    res = geoserver_service_client.rotate_api_key(k["id"])
+                                    plain_key = res.get("api_key")
+                                    key_id = res.get("id")
+                                    prefix = k.get("key_prefix", prefix)
+                                    break
+                            except Exception:
+                                pass
+                except Exception:
+                    pass
+
+            # 3. Jika belum ada sama sekali di microservice, buat key baru
+            if not plain_key:
+                res = geoserver_service_client.create_api_key(
                     name=f"Key - {user.username}",
-                    microservice_key_id=key_id,
-                    key_prefix=prefix,
-                    masked_key=mask_api_key(plain_key),
-                    api_key_secret=plain_key,
-                    is_active=True
+                    key_type=key_type,
+                    owner_info=owner_info
                 )
-                db.add(api_key)
-            else:
-                api_key.microservice_key_id = key_id
-                api_key.key_prefix = prefix
-                api_key.masked_key = mask_api_key(plain_key)
-                api_key.api_key_secret = plain_key
-                api_key.is_active = True
+                plain_key = res.get("api_key")
+                key_id = res.get("id")
 
-            db.commit()
-            db.refresh(api_key)
+            if plain_key and key_id:
+                if not api_key:
+                    api_key = ApiKey(
+                        user_id=user.id,
+                        name=f"Key - {user.username}",
+                        microservice_key_id=str(key_id),
+                        key_prefix=prefix,
+                        masked_key=mask_api_key(plain_key),
+                        api_key_secret=plain_key,
+                        is_active=True
+                    )
+                    db.add(api_key)
+                else:
+                    api_key.microservice_key_id = str(key_id)
+                    api_key.key_prefix = prefix
+                    api_key.masked_key = mask_api_key(plain_key)
+                    api_key.api_key_secret = plain_key
+                    api_key.is_active = True
+
+                db.commit()
+                db.refresh(api_key)
         except Exception as e:
             db.rollback()
-            print(f"[ensure_user_api_key] Failed to auto-generate key for {user.username}: {e}")
+            print(f"[ensure_user_api_key] Failed to auto-generate/reconcile key for {user.username}: {e}")
 
     return api_key
 
